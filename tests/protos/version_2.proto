@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package eto.pb2arrow.tests;
+
+message Struct {
+  optional uint64 v1 = 1;
+  optional bytes b1 = 2;
+}
+
+message Bar {
+  repeated sint32 a = 1;
+  optional bool b = 2;
+  optional double d = 3;
+  optional Struct s = 4;
+}
