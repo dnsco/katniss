@@ -5,6 +5,7 @@ use std::io::{Error, ErrorKind, Result};
 use arrow_array::builder::*;
 use arrow_array::{Array, RecordBatch};
 use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
+use prost_reflect::prost_types::Struct;
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 
 /// Parse messages and return RecordBatch
@@ -53,21 +54,33 @@ impl RecordBatchConverter {
             _ => (field.data_type(), None),
         };
         match inner_typ {
-            DataType::Boolean => wrap_builder(BooleanBuilder::with_capacity(capacity), is_large_list),
+            DataType::Boolean => {
+                wrap_builder(BooleanBuilder::with_capacity(capacity), is_large_list)
+            }
             DataType::Int32 => wrap_builder(Int32Builder::with_capacity(capacity), is_large_list),
             DataType::Int64 => wrap_builder(Int64Builder::with_capacity(capacity), is_large_list),
             DataType::UInt32 => wrap_builder(UInt32Builder::with_capacity(capacity), is_large_list),
             DataType::UInt64 => wrap_builder(UInt64Builder::with_capacity(capacity), is_large_list),
-            DataType::Float32 => wrap_builder(Float32Builder::with_capacity(capacity), is_large_list),
-            DataType::Float64 => wrap_builder(Float64Builder::with_capacity(capacity), is_large_list),
-            DataType::Binary => wrap_builder(BinaryBuilder::with_capacity(capacity, 1024), is_large_list),
-            DataType::LargeBinary => {
-                wrap_builder(LargeBinaryBuilder::with_capacity(capacity, 1024), is_large_list)
+            DataType::Float32 => {
+                wrap_builder(Float32Builder::with_capacity(capacity), is_large_list)
             }
-            DataType::Utf8 => wrap_builder(StringBuilder::with_capacity(capacity, 1024), is_large_list),
-            DataType::LargeUtf8 => {
-                wrap_builder(LargeStringBuilder::with_capacity(capacity, 1024), is_large_list)
+            DataType::Float64 => {
+                wrap_builder(Float64Builder::with_capacity(capacity), is_large_list)
             }
+            DataType::Binary => {
+                wrap_builder(BinaryBuilder::with_capacity(capacity, 1024), is_large_list)
+            }
+            DataType::LargeBinary => wrap_builder(
+                LargeBinaryBuilder::with_capacity(capacity, 1024),
+                is_large_list,
+            ),
+            DataType::Utf8 => {
+                wrap_builder(StringBuilder::with_capacity(capacity, 1024), is_large_list)
+            }
+            DataType::LargeUtf8 => wrap_builder(
+                LargeStringBuilder::with_capacity(capacity, 1024),
+                is_large_list,
+            ),
             DataType::Struct(fields) => wrap_builder(
                 RecordBatchConverter::make_struct_builder(fields.clone(), capacity),
                 is_large_list,
@@ -91,8 +104,8 @@ fn wrap_builder<T: ArrayBuilder>(builder: T, is_large_list: Option<bool>) -> Box
             } else {
                 Box::new(ListBuilder::new(builder))
             }
-        },
-        _ => Box::new(builder)
+        }
+        _ => Box::new(builder),
     }
 }
 
@@ -138,7 +151,12 @@ fn append_field(
             if is_missing_field {
                 append_list_value(f, builder, i, None)
             } else {
-                append_list_value(f, builder, i, msg.get_field_by_name(name).unwrap().as_list())
+                append_list_value(
+                    f,
+                    builder,
+                    i,
+                    msg.get_field_by_name(name).unwrap().as_list(),
+                )
             }
         }
         _ => {
@@ -208,8 +226,7 @@ fn append_non_list_value(
     Ok(())
 }
 
-
-macro_rules! set_list_value {
+macro_rules! set_list_val {
     // primitive inner
     ($builder:expr,$i:expr,$builder_typ:ty,$value_option:expr,$getter:ident,$value_typ:ty) => {{
         type ListBuilderType = ListBuilder<$builder_typ>;
@@ -228,24 +245,6 @@ macro_rules! set_list_value {
         }
         Ok(())
     }};
-    // struct inner
-    ($fields:expr,$builder:expr,$i:expr,$value_option:expr) => {{
-        type ListBuilderType = ListBuilder<StructBuilder>;
-        let b: &mut ListBuilderType = $builder.field_builder::<ListBuilderType>($i).unwrap();
-        match $value_option {
-            Some(lst) => {
-                for v in lst {
-                    append_all_fields($fields, b.values(), v.as_message())?;
-                }
-                b.append(true);
-            }
-            None => {
-                append_all_fields($fields, b.values(), None)?;
-                b.append(false);
-            }
-        }
-        Ok(())
-    }};
 }
 
 fn append_list_value(
@@ -257,72 +256,30 @@ fn append_list_value(
     let (inner_typ, is_large_list) = match f.data_type() {
         DataType::List(v) => (v.data_type(), Some(false)),
         DataType::LargeList(v) => (v.data_type(), Some(true)),
-        _ => return Err(Error::new(ErrorKind::InvalidInput, "append_list_value got a non-list field"))
+        _ => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "append_list_value got a non-list field",
+            ))
+        }
     };
     match inner_typ {
-        DataType::Float64 => set_list_value!(
-            builder,
-            i,
-            Float64Builder,
-            value_option,
-            as_f64,
-            f64
-        ),
-        DataType::Float32 => set_list_value!(
-            builder,
-            i,
-            Float32Builder,
-            value_option,
-            as_f32,
-            f32
-        ),
+        DataType::Float64 => set_list_val!(builder, i, Float64Builder, value_option, as_f64, f64),
+        DataType::Float32 => set_list_val!(builder, i, Float32Builder, value_option, as_f32, f32),
         DataType::Int64 => {
-            set_list_value!(builder, i, Int64Builder, value_option, as_i64, i64)
+            set_list_val!(builder, i, Int64Builder, value_option, as_i64, i64)
         }
         DataType::Int32 => {
-            set_list_value!(builder, i, Int32Builder, value_option, as_i32, i32)
+            set_list_val!(builder, i, Int32Builder, value_option, as_i32, i32)
         }
-        DataType::UInt64 => set_list_value!(
-            builder,
-            i,
-            UInt64Builder,
-            value_option,
-            as_u64,
-            u64
-        ),
-        DataType::UInt32 => set_list_value!(
-            builder,
-            i,
-            UInt32Builder,
-            value_option,
-            as_u32,
-            u32
-        ),
-        DataType::Utf8 => set_list_value!(
-            builder,
-            i,
-            StringBuilder,
-            value_option,
-            as_str,
-            &str
-        ),
-        DataType::LargeUtf8 => set_list_value!(
-            builder,
-            i,
-            LargeStringBuilder,
-            value_option,
-            as_str,
-            &str
-        ),
-        DataType::Binary => set_list_value!(
-            builder,
-            i,
-            BinaryBuilder,
-            value_option,
-            as_bytes,
-            Bytes
-        ),
-        DataType::LargeBinary => set_list_value!(
+        DataType::UInt64 => set_list_val!(builder, i, UInt64Builder, value_option, as_u64, u64),
+        DataType::UInt32 => set_list_val!(builder, i, UInt32Builder, value_option, as_u32, u32),
+        DataType::Utf8 => set_list_val!(builder, i, StringBuilder, value_option, as_str, &str),
+        DataType::LargeUtf8 => {
+            set_list_val!(builder, i, LargeStringBuilder, value_option, as_str, &str)
+        }
+        DataType::Binary => set_list_val!(builder, i, BinaryBuilder, value_option, as_bytes, Bytes),
+        DataType::LargeBinary => set_list_val!(
             builder,
             i,
             LargeBinaryBuilder,
@@ -330,16 +287,22 @@ fn append_list_value(
             as_bytes,
             Bytes
         ),
-        DataType::Boolean => set_list_value!(
-            builder,
-            i,
-            BooleanBuilder,
-            value_option,
-            as_bool,
-            bool
-        ),
+        DataType::Boolean => set_list_val!(builder, i, BooleanBuilder, value_option, as_bool, bool),
         DataType::Struct(nested_fields) => {
-            set_list_value!(nested_fields, builder, i, value_option)
+            let b: &mut ListBuilder<StructBuilder> = builder.field_builder(i).unwrap();
+            match value_option {
+                Some(lst) => {
+                    for v in lst {
+                        append_all_fields(nested_fields, b.values(), v.as_message())?;
+                    }
+                    b.append(true);
+                }
+                None => {
+                    append_all_fields(nested_fields, b.values(), None)?;
+                    b.append(false);
+                }
+            }
+            Ok(())
         }
         _ => unimplemented!("Unsupported inner_typ {}", inner_typ),
     }
