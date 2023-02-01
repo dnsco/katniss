@@ -1,12 +1,11 @@
-use std::path::PathBuf;
-
-use anyhow::{Context, Result};
-
-use arrow_schema::SchemaRef;
+use anyhow::Result;
 use prost_arrow::SchemaConverter;
-use prost_reflect::MessageDescriptor;
+use prost_reflect::DescriptorPool;
 
-mod protos {
+pub mod protos {
+    pub const FILE_DESCRIPTOR_BYTES: &[u8] =
+        include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
+
     pub mod spacecorp {
         include!(concat!(env!("OUT_DIR"), "/eto.pb2arrow.tests.spacecorp.rs"));
     }
@@ -20,40 +19,29 @@ mod protos {
     }
 }
 
-#[allow(unused)]
-fn schemas_for(proto_file: &str, short_name: &str) -> Result<(SchemaRef, MessageDescriptor)> {
-    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("../protos/test");
+pub fn schema_converter() -> Result<SchemaConverter> {
+    let pool = descriptor_pool()?;
+    Ok(SchemaConverter::new(pool))
+}
 
-    let proto = d.join(proto_file);
-    let schemas = SchemaConverter::compile(&[proto], &[d])
-        .context(format!("Failed to compile {proto_file}"))?;
-
-    let arrow_schema = schemas
-        .get_arrow_schema_by_short_name(short_name, &[])?
-        .context("No schema found")?;
-
-    let proto_schema = schemas
-        .get_message_short_name(short_name)
-        .context("no message")?;
-
-    Ok((SchemaRef::new(arrow_schema), proto_schema))
+fn descriptor_pool() -> Result<DescriptorPool> {
+    Ok(DescriptorPool::decode(protos::FILE_DESCRIPTOR_BYTES)?)
 }
 
 #[cfg(test)]
 mod test {
-    use anyhow::Result;
+    use anyhow::{Context, Result};
+    use arrow_schema::SchemaRef;
     use prost::Message;
     use prost_arrow::RecordBatchConverter;
-    use prost_reflect::DynamicMessage;
+    use prost_reflect::{DynamicMessage, MessageDescriptor};
 
-    use crate::schemas_for;
-
-    use super::protos::v3::{MessageWithNestedEnum, SomeRandomEnum};
+    use super::*;
+    use crate::protos::v3::{MessageWithNestedEnum, SomeRandomEnum};
 
     #[test]
     fn test_enums() -> Result<()> {
-        let (arrow_schema, proto_schema) = schemas_for("version_3.proto", "MessageWithNestedEnum")?;
+        let (arrow_schema, proto_schema) = schemas_for("MessageWithNestedEnum")?;
 
         let mut converter = RecordBatchConverter::new(arrow_schema, 1);
 
@@ -70,5 +58,19 @@ mod test {
         dbg!(batch);
 
         Ok(())
+    }
+
+    fn schemas_for(short_name: &str) -> Result<(SchemaRef, MessageDescriptor)> {
+        let schemas = schema_converter()?;
+
+        let arrow_schema = schemas
+            .get_arrow_schema_by_short_name(short_name, &[])?
+            .context("No schema found")?;
+
+        let proto_schema = schemas
+            .get_message_short_name(short_name)
+            .context("no message")?;
+
+        Ok((SchemaRef::new(arrow_schema), proto_schema))
     }
 }

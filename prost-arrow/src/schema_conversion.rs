@@ -48,6 +48,9 @@ fn to_arrow(f: &FieldDescriptor) -> Result<Field> {
 }
 
 impl SchemaConverter {
+    pub fn new(descriptor_pool: DescriptorPool) -> Self {
+        Self { descriptor_pool }
+    }
     /// Compile protobuf files and build the converter.
     ///
     /// ```rust
@@ -79,9 +82,7 @@ impl SchemaConverter {
         reader.read_to_end(&mut buffer)?;
 
         let pool = DescriptorPool::decode(buffer.as_slice()).unwrap();
-        Ok(Self {
-            descriptor_pool: pool,
-        })
+        Ok(Self::new(pool))
     }
 
     /// Get the arrow schema of the protobuf message, specified by the qualified message name.
