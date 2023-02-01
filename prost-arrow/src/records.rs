@@ -1,11 +1,14 @@
-use std::borrow::Cow;
 use std::io::ErrorKind::InvalidData;
 use std::io::{Error, ErrorKind, Result};
+use std::ops::Deref;
 
 use arrow_array::builder::*;
 use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
+
+mod macros;
+use macros::*;
 
 /// Parse messages and return RecordBatch
 pub struct RecordBatchConverter {
@@ -159,33 +162,16 @@ fn append_field(
     }
 }
 
-fn append_non_list_value(
+fn append_non_list_value<V: Deref<Target = Value> + std::fmt::Display>(
     f: &Field,
     builder: &mut StructBuilder,
     i: usize,
-    value: Option<Cow<Value>>,
+    value: Option<V>,
 ) -> Result<()> {
-    if let Some(Cow::Borrowed(Value::EnumNumber(num))) = value {
+    if let Some(Value::EnumNumber(num)) = value.as_deref() {
         let b = builder.field_builder::<Int32Builder>(i).unwrap();
         b.append_value(*num);
         return Ok(());
-    }
-
-    /// append a value to given builder
-    macro_rules! set_value {
-        ($builder:expr,$i:expr,$typ:ty,$getter:ident,$value:expr) => {{
-            let b: &mut $typ = $builder.field_builder::<$typ>($i).unwrap();
-            match $value {
-                Some(cow) => {
-                    let v = cow.$getter().ok_or_else(|| {
-                        let msg = format!("Could not cast {} to correct type", cow);
-                        Error::new(InvalidData, msg)
-                    })?;
-                    b.append_value(v)
-                }
-                None => b.append_null(),
-            }
-        }};
     }
 
     match f.data_type() {
@@ -213,27 +199,6 @@ fn append_non_list_value(
         ),
     }
     Ok(())
-}
-
-macro_rules! set_list_val {
-    // primitive inner
-    ($builder:expr,$i:expr,$builder_typ:ty,$value_option:expr,$getter:ident,$value_typ:ty) => {{
-        type ListBuilderType = ListBuilder<$builder_typ>;
-        let b: &mut ListBuilderType = $builder.field_builder::<ListBuilderType>($i).unwrap();
-        match $value_option {
-            Some(lst) => {
-                for v in lst {
-                    b.values().append_value(v.$getter().unwrap());
-                }
-                b.append(true);
-            }
-            None => {
-                b.values().append_null();
-                b.append(false);
-            }
-        }
-        Ok(())
-    }};
 }
 
 fn append_list_value(
