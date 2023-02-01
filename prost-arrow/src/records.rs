@@ -99,44 +99,9 @@ impl TryFrom<&mut RecordBatchConverter> for RecordBatch {
     type Error = ArrowError;
 
     fn try_from(converter: &mut RecordBatchConverter) -> core::result::Result<Self, Self::Error> {
-        let arrays: Vec<ArrayRef> = converter
-            .schema
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(i, field)| get_array(field, &mut converter.builder, i).unwrap())
-            .collect();
-        RecordBatch::try_new(SchemaRef::from(converter.schema.clone()), arrays)
+        let struct_array = converter.builder.finish();
+        Ok(RecordBatch::from(&struct_array))
     }
-}
-
-fn finish<T: ArrayBuilder>(
-    builder: &mut StructBuilder,
-    i: usize,
-    nlevels: i32,
-) -> Result<ArrayRef> {
-    let b: &mut dyn ArrayBuilder = match nlevels {
-        0 => builder.field_builder::<T>(i).unwrap(),
-        1 => builder.field_builder::<ListBuilder<T>>(i).unwrap(),
-        2 => builder
-            .field_builder::<ListBuilder<ListBuilder<T>>>(i)
-            .unwrap(),
-        3 => builder
-            .field_builder::<ListBuilder<ListBuilder<ListBuilder<T>>>>(i)
-            .unwrap(),
-        4 => builder
-            .field_builder::<ListBuilder<ListBuilder<ListBuilder<ListBuilder<T>>>>>(i)
-            .unwrap(),
-        5 => builder
-            .field_builder::<ListBuilder<ListBuilder<ListBuilder<ListBuilder<ListBuilder<T>>>>>>(i)
-            .unwrap(),
-        _ => Err(Error::new(
-            InvalidData,
-            "Dafuq you doing with this matryoshka doll",
-        ))?,
-    };
-
-    Ok(Arc::new(b.finish()))
 }
 
 fn get_list_levels(f: &Field) -> (&DataType, i32) {
@@ -146,28 +111,6 @@ fn get_list_levels(f: &Field) -> (&DataType, i32) {
             (inner_typ, nlevels + 1)
         }
         _ => (f.data_type(), 0),
-    }
-}
-
-fn get_array(f: &Field, builder: &mut StructBuilder, i: usize) -> Result<ArrayRef> {
-    let (typ, nlevels) = get_list_levels(f);
-    match typ {
-        DataType::Float64 => finish::<Float64Builder>(builder, i, nlevels),
-        DataType::Float32 => finish::<Float32Builder>(builder, i, nlevels),
-        DataType::Int64 => finish::<Int64Builder>(builder, i, nlevels),
-        DataType::Int32 => finish::<Int32Builder>(builder, i, nlevels),
-        DataType::UInt64 => finish::<UInt64Builder>(builder, i, nlevels),
-        DataType::UInt32 => finish::<UInt32Builder>(builder, i, nlevels),
-        DataType::Utf8 => finish::<StringBuilder>(builder, i, nlevels),
-        DataType::LargeUtf8 => finish::<LargeStringBuilder>(builder, i, nlevels),
-        DataType::Binary => finish::<BinaryBuilder>(builder, i, nlevels),
-        DataType::LargeBinary => finish::<LargeBinaryBuilder>(builder, i, nlevels),
-        DataType::Boolean => finish::<BooleanBuilder>(builder, i, nlevels),
-        DataType::Struct(_) => finish::<StructBuilder>(builder, i, nlevels),
-        _ => {
-            let msg = format!("Unsupported field type {f}");
-            unimplemented!("{}", msg)
-        }
     }
 }
 
