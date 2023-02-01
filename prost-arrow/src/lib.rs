@@ -59,11 +59,11 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn test_read_messages() {
-    //     _run_messages_test(2, "version_2.proto", "Bar");
-    //     _run_messages_test(3, "version_3.proto", "Bar");
-    // }
+    #[test]
+    fn test_read_messages() {
+        _run_messages_test(2, "version_2.proto", "Bar");
+        _run_messages_test(3, "version_3.proto", "Bar");
+    }
 
     fn _run_messages_test(version: i8, proto_file: &str, short_name: &str) {
         let projection: &[&str] = &vec!["a", "b", "d", "s.v1"];
