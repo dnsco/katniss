@@ -51,9 +51,9 @@ impl SchemaConverter {
     /// Compile protobuf files and build the converter.
     ///
     /// ```rust
-    ///   use prost_arrow::Converter;
+    ///   use prost_arrow::SchemaConverter;
     ///
-    ///   let convert = Converter::compile(
+    ///   let convert = SchemaConverter::compile(
     ///       &["protos/foo.proto"], &["protos"]
     ///   ).unwrap();
     /// ```

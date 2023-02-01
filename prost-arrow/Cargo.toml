@@ -1,0 +1,13 @@
+[package]
+name = "prost-arrow"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+arrow-array = "32.0.0"
+arrow-schema = "32.0.0"
+prost-reflect = "0.10.1"
+tempfile = "3.3.0"
+which = "4.4.0"
