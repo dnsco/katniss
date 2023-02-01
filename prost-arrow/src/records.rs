@@ -16,55 +16,22 @@ pub struct RecordBatchConverter {
     builder: StructBuilder, // fields align with schema
 }
 
-macro_rules! make_list {
-    ($builder:expr,$nlevels:expr) => {{
-        if $nlevels == 0 {
-            Box::new($builder) as Box<dyn ArrayBuilder>
-        } else if $nlevels == 1 {
-            Box::new(ListBuilder::new($builder)) as Box<dyn ArrayBuilder>
-        } else if $nlevels == 2 {
-            Box::new(ListBuilder::new(ListBuilder::new($builder))) as Box<dyn ArrayBuilder>
-        } else if $nlevels == 3 {
-            Box::new(ListBuilder::new(ListBuilder::new(ListBuilder::new(
-                $builder,
-            )))) as Box<dyn ArrayBuilder>
-        } else {
-            unimplemented!("matryoshka")
-        }
-    }};
-}
-
-macro_rules! make_builder {
-    ($datatype:expr,$capacity:expr,$nlevels:expr) => {{
-        match $datatype {
-            DataType::Boolean => make_list!(BooleanBuilder::with_capacity($capacity), $nlevels),
-            DataType::Int32 => make_list!(Int32Builder::with_capacity($capacity), $nlevels),
-            DataType::Int64 => make_list!(Int64Builder::with_capacity($capacity), $nlevels),
-            DataType::UInt32 => make_list!(UInt32Builder::with_capacity($capacity), $nlevels),
-            DataType::UInt64 => make_list!(UInt64Builder::with_capacity($capacity), $nlevels),
-            DataType::Float32 => make_list!(Float32Builder::with_capacity($capacity), $nlevels),
-            DataType::Float64 => make_list!(Float64Builder::with_capacity($capacity), $nlevels),
-            DataType::Binary => {
-                make_list!(BinaryBuilder::with_capacity($capacity, 1024), $nlevels)
-            }
-            DataType::LargeBinary => {
-                make_list!(LargeBinaryBuilder::with_capacity($capacity, 1024), $nlevels)
-            }
-            DataType::Utf8 => {
-                make_list!(StringBuilder::with_capacity($capacity, 1024), $nlevels)
-            }
-            DataType::LargeUtf8 => {
-                make_list!(LargeStringBuilder::with_capacity($capacity, 1024), $nlevels)
-            }
-            DataType::Struct(fields) => {
-                make_list!(
-                    RecordBatchConverter::make_struct_builder(fields.clone(), $capacity),
-                    $nlevels
-                )
-            }
-            t => panic!("Data type {:?} is not currently supported", t),
-        }
-    }};
+fn make_list<T: ArrayBuilder>(builder: T, nlevels: i32) -> Box<dyn ArrayBuilder> {
+    match nlevels {
+        0 => Box::new(builder),
+        1 => Box::new(ListBuilder::new(builder)),
+        2 => Box::new(ListBuilder::new(ListBuilder::new(builder))),
+        3 => Box::new(ListBuilder::new(ListBuilder::new(ListBuilder::new(
+            builder,
+        )))),
+        4 => Box::new(ListBuilder::new(ListBuilder::new(ListBuilder::new(
+            ListBuilder::new(builder),
+        )))),
+        5 => Box::new(ListBuilder::new(ListBuilder::new(ListBuilder::new(
+            ListBuilder::new(ListBuilder::new(builder)),
+        )))),
+        _ => unimplemented!("matryoshka"),
+    }
 }
 
 impl RecordBatchConverter {
@@ -98,7 +65,28 @@ impl RecordBatchConverter {
 
     fn make_builder(field: &Field, capacity: usize) -> Box<dyn ArrayBuilder> {
         let (inner_typ, nlevels) = get_list_levels(field);
-        make_builder!(inner_typ, capacity, nlevels)
+        match inner_typ {
+            DataType::Boolean => make_list(BooleanBuilder::with_capacity(capacity), nlevels),
+            DataType::Int32 => make_list(Int32Builder::with_capacity(capacity), nlevels),
+            DataType::Int64 => make_list(Int64Builder::with_capacity(capacity), nlevels),
+            DataType::UInt32 => make_list(UInt32Builder::with_capacity(capacity), nlevels),
+            DataType::UInt64 => make_list(UInt64Builder::with_capacity(capacity), nlevels),
+            DataType::Float32 => make_list(Float32Builder::with_capacity(capacity), nlevels),
+            DataType::Float64 => make_list(Float64Builder::with_capacity(capacity), nlevels),
+            DataType::Binary => make_list(BinaryBuilder::with_capacity(capacity, 1024), nlevels),
+            DataType::LargeBinary => {
+                make_list(LargeBinaryBuilder::with_capacity(capacity, 1024), nlevels)
+            }
+            DataType::Utf8 => make_list(StringBuilder::with_capacity(capacity, 1024), nlevels),
+            DataType::LargeUtf8 => {
+                make_list(LargeStringBuilder::with_capacity(capacity, 1024), nlevels)
+            }
+            DataType::Struct(fields) => make_list(
+                RecordBatchConverter::make_struct_builder(fields.clone(), capacity),
+                nlevels,
+            ),
+            t => panic!("Data type {:?} is not currently supported", t),
+        }
     }
 
     pub fn records(&mut self) -> core::result::Result<RecordBatch, ArrowError> {
