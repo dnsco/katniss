@@ -1,7 +1,4 @@
 
 [workspace]
 
-members = [
-    "prost-arrow",
-]
-
+members = ["prost-arrow", "prost-arrow-test"]

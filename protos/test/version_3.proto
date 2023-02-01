@@ -18,3 +18,13 @@ message Bar {
 	double d = 3;
 	Struct s = 4;
 }
+
+message MessageWithNestedEnum {
+	SomeRandomEnum status = 1;	
+}
+
+enum SomeRandomEnum {
+    PASSSING = 0;
+    FAILING = 1;
+    LEGACY = 2;
+}

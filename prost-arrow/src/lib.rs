@@ -22,7 +22,7 @@ mod tests {
 
     fn converter_for(proto_file: &str) -> SchemaConverter {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("tests/protos");
+        d.push("../protos/test");
 
         let proto = d.join(proto_file);
         SchemaConverter::compile(&[proto], &[d])
@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn test_enum() -> Result<()> {
-        let converter = converter_for("nested_enum.proto");
+        let converter = converter_for("version_3.proto");
         //    dbg!(converter.get_arrow_schema_by_short_name("MessageWithNestedEnum", &["status"]));
 
         let schema = converter
