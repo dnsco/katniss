@@ -58,7 +58,6 @@ mod test {
         converter.append_message(&dynamic_message)?;
 
         let batch = converter.records()?;
-        dbg!(batch);
 
         Ok(())
     }

@@ -122,31 +122,33 @@ impl TryFrom<&mut RecordBatchConverter> for RecordBatch {
     }
 }
 
-macro_rules! finish {
-    ($builder:expr,$i:expr,$typ:ident,$nlevels:expr) => {
-        if $nlevels == 0 {
-            let b = $builder.field_builder::<$typ>($i).unwrap();
-            Ok(Arc::new(b.finish()) as ArrayRef)
-        } else if $nlevels == 1 {
-            let b = $builder.field_builder::<ListBuilder<$typ>>($i).unwrap();
-            Ok(Arc::new(b.finish()) as ArrayRef)
-        } else if $nlevels == 2 {
-            let b = $builder
-                .field_builder::<ListBuilder<ListBuilder<$typ>>>($i)
-                .unwrap();
-            Ok(Arc::new(b.finish()) as ArrayRef)
-        } else if $nlevels == 3 {
-            let b = $builder
-                .field_builder::<ListBuilder<ListBuilder<ListBuilder<$typ>>>>($i)
-                .unwrap();
-            Ok(Arc::new(b.finish()) as ArrayRef)
-        } else {
-            Err(Error::new(
-                InvalidData,
-                "Dafuq you doing with this matryoshka doll",
-            ))
-        }
-    };
+fn finish<T: ArrayBuilder>(
+    builder: &mut StructBuilder,
+    i: usize,
+    nlevels: i32,
+) -> Result<ArrayRef> {
+    if nlevels == 0 {
+        let b = builder.field_builder::<T>(i).unwrap();
+        Ok(Arc::new(b.finish()) as ArrayRef)
+    } else if nlevels == 1 {
+        let b = builder.field_builder::<ListBuilder<T>>(i).unwrap();
+        Ok(Arc::new(b.finish()) as ArrayRef)
+    } else if nlevels == 2 {
+        let b = builder
+            .field_builder::<ListBuilder<ListBuilder<T>>>(i)
+            .unwrap();
+        Ok(Arc::new(b.finish()) as ArrayRef)
+    } else if nlevels == 3 {
+        let b = builder
+            .field_builder::<ListBuilder<ListBuilder<ListBuilder<T>>>>(i)
+            .unwrap();
+        Ok(Arc::new(b.finish()) as ArrayRef)
+    } else {
+        Err(Error::new(
+            InvalidData,
+            "Dafuq you doing with this matryoshka doll",
+        ))
+    }
 }
 
 fn get_list_levels(f: &Field) -> (&DataType, i32) {
@@ -162,18 +164,18 @@ fn get_list_levels(f: &Field) -> (&DataType, i32) {
 fn get_array(f: &Field, builder: &mut StructBuilder, i: usize) -> Result<ArrayRef> {
     let (typ, nlevels) = get_list_levels(f);
     match typ {
-        DataType::Float64 => finish!(builder, i, Float64Builder, nlevels),
-        DataType::Float32 => finish!(builder, i, Float32Builder, nlevels),
-        DataType::Int64 => finish!(builder, i, Int64Builder, nlevels),
-        DataType::Int32 => finish!(builder, i, Int32Builder, nlevels),
-        DataType::UInt64 => finish!(builder, i, UInt64Builder, nlevels),
-        DataType::UInt32 => finish!(builder, i, UInt32Builder, nlevels),
-        DataType::Utf8 => finish!(builder, i, StringBuilder, nlevels),
-        DataType::LargeUtf8 => finish!(builder, i, LargeStringBuilder, nlevels),
-        DataType::Binary => finish!(builder, i, BinaryBuilder, nlevels),
-        DataType::LargeBinary => finish!(builder, i, LargeBinaryBuilder, nlevels),
-        DataType::Boolean => finish!(builder, i, BooleanBuilder, nlevels),
-        DataType::Struct(_) => finish!(builder, i, StructBuilder, nlevels),
+        DataType::Float64 => finish::<Float64Builder>(builder, i, nlevels),
+        DataType::Float32 => finish::<Float32Builder>(builder, i, nlevels),
+        DataType::Int64 => finish::<Int64Builder>(builder, i, nlevels),
+        DataType::Int32 => finish::<Int32Builder>(builder, i, nlevels),
+        DataType::UInt64 => finish::<UInt64Builder>(builder, i, nlevels),
+        DataType::UInt32 => finish::<UInt32Builder>(builder, i, nlevels),
+        DataType::Utf8 => finish::<StringBuilder>(builder, i, nlevels),
+        DataType::LargeUtf8 => finish::<LargeStringBuilder>(builder, i, nlevels),
+        DataType::Binary => finish::<BinaryBuilder>(builder, i, nlevels),
+        DataType::LargeBinary => finish::<LargeBinaryBuilder>(builder, i, nlevels),
+        DataType::Boolean => finish::<BooleanBuilder>(builder, i, nlevels),
+        DataType::Struct(_) => finish::<StructBuilder>(builder, i, nlevels),
         _ => {
             let msg = format!("Unsupported field type {f}");
             unimplemented!("{}", msg)
