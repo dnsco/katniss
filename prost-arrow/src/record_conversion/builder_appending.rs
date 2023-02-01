@@ -3,115 +3,12 @@ use std::io::{Error, ErrorKind, Result};
 use std::ops::Deref;
 
 use arrow_array::builder::*;
-use arrow_array::RecordBatch;
-use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
+use arrow_schema::{DataType, Field};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 
-mod macros;
-use macros::*;
+use super::macros::*;
 
-/// Parse messages and return RecordBatch
-pub struct RecordBatchConverter {
-    pub(crate) schema: SchemaRef,
-    #[allow(unused)]
-    batch_size: usize,
-    builder: StructBuilder, // fields align with schema
-}
-
-impl RecordBatchConverter {
-    pub fn new(schema: SchemaRef, batch_size: usize) -> RecordBatchConverter {
-        let builder =
-            RecordBatchConverter::make_struct_builder(schema.fields().clone(), batch_size);
-        RecordBatchConverter {
-            schema,
-            batch_size,
-            builder,
-        }
-    }
-
-    /// Append a new protobuf message to this batch
-    pub fn append_message(&mut self, msg: &DynamicMessage) -> Result<()> {
-        append_all_fields(self.schema.fields(), &mut self.builder, Some(msg))
-    }
-
-    /// Number of rows in this batch so far
-    pub fn len(&self) -> usize {
-        self.builder.len()
-    }
-
-    fn make_struct_builder(fields: Vec<Field>, capacity: usize) -> StructBuilder {
-        let mut builders = Vec::with_capacity(fields.len());
-        for field in &fields {
-            builders.push(RecordBatchConverter::make_builder(field, capacity));
-        }
-        StructBuilder::new(fields, builders)
-    }
-
-    /// Create the appropriate ArrayBuilder for the given field and capacity
-    fn make_builder(field: &Field, capacity: usize) -> Box<dyn ArrayBuilder> {
-        // arrow needs generic builder methods
-        let (inner_typ, kind) = match field.data_type() {
-            DataType::List(v) => (v.data_type(), ListKind::List),
-            DataType::LargeList(v) => (v.data_type(), ListKind::LargeList),
-            _ => (field.data_type(), ListKind::NotList),
-        };
-
-        match inner_typ {
-            DataType::Boolean => wrap_builder(BooleanBuilder::with_capacity(capacity), kind),
-            DataType::Int32 => wrap_builder(Int32Builder::with_capacity(capacity), kind),
-            DataType::Int64 => wrap_builder(Int64Builder::with_capacity(capacity), kind),
-            DataType::UInt32 => wrap_builder(UInt32Builder::with_capacity(capacity), kind),
-            DataType::UInt64 => wrap_builder(UInt64Builder::with_capacity(capacity), kind),
-            DataType::Float32 => wrap_builder(Float32Builder::with_capacity(capacity), kind),
-            DataType::Float64 => wrap_builder(Float64Builder::with_capacity(capacity), kind),
-            DataType::Binary => wrap_builder(BinaryBuilder::with_capacity(capacity, 1024), kind),
-            DataType::LargeBinary => {
-                wrap_builder(LargeBinaryBuilder::with_capacity(capacity, 1024), kind)
-            }
-            DataType::Utf8 => wrap_builder(StringBuilder::with_capacity(capacity, 1024), kind),
-            DataType::LargeUtf8 => {
-                wrap_builder(LargeStringBuilder::with_capacity(capacity, 1024), kind)
-            }
-            DataType::Struct(fields) => wrap_builder(
-                RecordBatchConverter::make_struct_builder(fields.clone(), capacity),
-                kind,
-            ),
-            t => panic!("Data type {:?} is not currently supported", t),
-        }
-    }
-
-    pub fn records(&mut self) -> core::result::Result<RecordBatch, ArrowError> {
-        self.try_into()
-    }
-}
-
-enum ListKind {
-    List,
-    LargeList,
-    NotList,
-}
-
-/// Return the boxed builder or wrap it in a ListBuilder then box
-/// this is necessary because
-fn wrap_builder<T: ArrayBuilder>(builder: T, kind: ListKind) -> Box<dyn ArrayBuilder> {
-    match kind {
-        ListKind::List => Box::new(ListBuilder::new(builder)),
-        ListKind::LargeList => Box::new(LargeListBuilder::new(builder)),
-        ListKind::NotList => Box::new(builder),
-    }
-}
-
-/// Convert RecordBatch from RecordBatchConverter.
-impl TryFrom<&mut RecordBatchConverter> for RecordBatch {
-    type Error = ArrowError;
-
-    fn try_from(converter: &mut RecordBatchConverter) -> core::result::Result<Self, Self::Error> {
-        let struct_array = converter.builder.finish();
-        Ok(RecordBatch::from(&struct_array))
-    }
-}
-
-fn append_all_fields(
+pub fn append_all_fields(
     fields: &Vec<Field>,
     builder: &mut StructBuilder,
     msg: Option<&DynamicMessage>,
@@ -208,16 +105,19 @@ fn append_list_value(
     value_option: Option<&[Value]>,
 ) -> Result<()> {
     let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type()  else {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "append_list_value got a non-list field",
-            ))
-
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "append_list_value got a non-list field",
+        ))
     };
 
     match inner.data_type() {
-        DataType::Float64 => set_list_val!(builder, i, Float64Builder, value_option, as_f64, f64),
-        DataType::Float32 => set_list_val!(builder, i, Float32Builder, value_option, as_f32, f32),
+        DataType::Float64 => {
+            set_list_val!(builder, i, Float64Builder, value_option, as_f64, f64)
+        }
+        DataType::Float32 => {
+            set_list_val!(builder, i, Float32Builder, value_option, as_f32, f32)
+        }
         DataType::Int64 => {
             set_list_val!(builder, i, Int64Builder, value_option, as_i64, i64)
         }
@@ -230,7 +130,9 @@ fn append_list_value(
         DataType::LargeUtf8 => {
             set_list_val!(builder, i, LargeStringBuilder, value_option, as_str, &str)
         }
-        DataType::Binary => set_list_val!(builder, i, BinaryBuilder, value_option, as_bytes, Bytes),
+        DataType::Binary => {
+            set_list_val!(builder, i, BinaryBuilder, value_option, as_bytes, Bytes)
+        }
         DataType::LargeBinary => set_list_val!(
             builder,
             i,
@@ -239,7 +141,9 @@ fn append_list_value(
             as_bytes,
             Bytes
         ),
-        DataType::Boolean => set_list_val!(builder, i, BooleanBuilder, value_option, as_bool, bool),
+        DataType::Boolean => {
+            set_list_val!(builder, i, BooleanBuilder, value_option, as_bool, bool)
+        }
         DataType::Struct(nested_fields) => {
             let b: &mut ListBuilder<StructBuilder> = builder.field_builder(i).unwrap();
             match value_option {

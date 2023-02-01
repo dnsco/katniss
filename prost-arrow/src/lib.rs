@@ -1,10 +1,10 @@
 //! Convert Protobuf schema and message into Apache Arrow Schema and Tables.
 //!
-mod records;
-mod schema;
+mod record_conversion;
+mod schema_conversion;
 
-pub use records::RecordBatchConverter;
-pub use schema::SchemaConverter;
+pub use record_conversion::RecordBatchConverter;
+pub use schema_conversion::SchemaConverter;
 
 #[cfg(test)]
 mod tests {
