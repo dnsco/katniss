@@ -47,17 +47,17 @@ mod test {
 
         let mut converter = RecordBatchConverter::new(arrow_schema, 1);
 
-        // let message = MessageWithNestedEnum {
-        //     status: SomeRandomEnum::Failing.into(),
-        // };
-        // let proto_bytes: &[u8] = &message.encode_to_vec();
-        // dbg!(proto_bytes);
-        // let dynamic_message = DynamicMessage::decode(proto_schema.clone(), proto_bytes)?;
-        let mut dynamic_message = DynamicMessage::new(proto_schema);
-        dynamic_message.set_field_by_name("status", Value::EnumNumber(2));
-        converter.append_message(&dynamic_message)?;
+        let message = MessageWithNestedEnum {
+            status: SomeRandomEnum::Failing.into(),
+        };
+
+        converter.append_message(&DynamicMessage::decode(
+            proto_schema.clone(),
+            &message.encode_to_vec() as &[u8],
+        )?)?;
 
         let batch = converter.records()?;
+        dbg!(batch);
 
         Ok(())
     }
