@@ -7,7 +7,17 @@ use prost_arrow::SchemaConverter;
 use prost_reflect::MessageDescriptor;
 
 mod protos {
-    include!(concat!(env!("OUT_DIR"), "/eto.pb2arrow.tests.rs"));
+    pub mod spacecorp {
+        include!(concat!(env!("OUT_DIR"), "/eto.pb2arrow.tests.spacecorp.rs"));
+    }
+
+    pub mod v2 {
+        include!(concat!(env!("OUT_DIR"), "/eto.pb2arrow.tests.v2.rs"));
+    }
+
+    pub mod v3 {
+        include!(concat!(env!("OUT_DIR"), "/eto.pb2arrow.tests.v3.rs"));
+    }
 }
 
 #[allow(unused)]
@@ -39,7 +49,7 @@ mod test {
 
     use crate::schemas_for;
 
-    use super::protos::{MessageWithNestedEnum, SomeRandomEnum};
+    use super::protos::v3::{MessageWithNestedEnum, SomeRandomEnum};
 
     #[test]
     fn test_enums() -> Result<()> {

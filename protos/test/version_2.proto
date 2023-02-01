@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package eto.pb2arrow.tests;
+package eto.pb2arrow.tests.v2;
 
 message Struct {
   optional uint64 v1 = 1;

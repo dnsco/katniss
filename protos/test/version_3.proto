@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package eto.pb2arrow.tests;
+package eto.pb2arrow.tests.v3;
 
 message Foo {
 	int32 key = 1;
@@ -20,7 +20,7 @@ message Bar {
 }
 
 message MessageWithNestedEnum {
-	SomeRandomEnum status = 1;	
+	SomeRandomEnum status = 1;
 }
 
 enum SomeRandomEnum {

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package eto.pb2arrow.spacecorp_tests;
+package eto.pb2arrow.tests.spacecorp;
 
 
 // Generic Wrapper struct that holds a reading for a component at a point in time

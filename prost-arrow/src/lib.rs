@@ -33,7 +33,7 @@ mod tests {
     fn test_load_protobuf() {
         let converter = converter_for("version_3.proto");
         let schema = converter
-            .get_arrow_schema("eto.pb2arrow.tests.Foo", vec![].as_slice())
+            .get_arrow_schema("eto.pb2arrow.tests.v3.Foo", vec![].as_slice())
             .unwrap()
             .unwrap();
         let expected_schema = Schema::new(vec![
@@ -49,7 +49,7 @@ mod tests {
         //    dbg!(converter.get_arrow_schema_by_short_name("MessageWithNestedEnum", &["status"]));
 
         let schema = converter
-            .get_arrow_schema("eto.pb2arrow.tests.MessageWithNestedEnum", &[])?
+            .get_arrow_schema("eto.pb2arrow.tests.v3.MessageWithNestedEnum", &[])?
             .expect("no schema found");
         let schema = SchemaRef::new(schema);
 
@@ -70,7 +70,7 @@ mod tests {
 
         let converter = converter_for(proto_file);
         let schema = converter
-            .get_arrow_schema("eto.pb2arrow.tests.Bar", projection)
+            .get_arrow_schema_by_short_name(short_name, projection)
             .unwrap()
             .unwrap();
 
