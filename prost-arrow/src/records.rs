@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 use std::io::ErrorKind::InvalidData;
 use std::io::{Error, Result};
-use std::sync::Arc;
 
 use arrow_array::builder::*;
-use arrow_array::{ArrayRef, RecordBatch};
+use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 

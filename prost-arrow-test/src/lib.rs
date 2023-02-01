@@ -35,7 +35,7 @@ mod test {
     use anyhow::Result;
     use prost::Message;
     use prost_arrow::RecordBatchConverter;
-    use prost_reflect::{DynamicMessage, Value};
+    use prost_reflect::DynamicMessage;
 
     use crate::schemas_for;
 
