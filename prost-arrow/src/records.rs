@@ -100,6 +100,10 @@ impl RecordBatchConverter {
         let (inner_typ, nlevels) = get_list_levels(field);
         make_builder!(inner_typ, capacity, nlevels)
     }
+
+    pub fn records(&mut self) -> core::result::Result<RecordBatch, ArrowError> {
+        self.try_into()
+    }
 }
 
 /// Convert RecordBatch from RecordBatchConverter.
@@ -193,8 +197,10 @@ fn append_all_fields(
 macro_rules! set_value {
     ($builder:expr,$i:expr,$typ:ty,$getter:ident,$value:expr) => {{
         let b: &mut $typ = $builder.field_builder::<$typ>($i).unwrap();
+
         match $value {
             Some(cow) => {
+                dbg!(&cow);
                 let v = cow.$getter().ok_or_else(|| {
                     let msg = format!("Could not cast {} to correct type", cow);
                     Error::new(InvalidData, msg)
@@ -212,6 +218,11 @@ fn append_non_list_value(
     i: usize,
     value: Option<Cow<Value>>,
 ) -> Result<()> {
+    if let Some(Cow::Borrowed(Value::EnumNumber(num))) = value {
+        let b = builder.field_builder::<Int32Builder>(i).unwrap();
+        b.append_value(*num);
+        return Ok(());
+    }
     match f.data_type() {
         DataType::Float64 => set_value!(builder, i, Float64Builder, as_f64, value),
         DataType::Float32 => set_value!(builder, i, Float32Builder, as_f32, value),
