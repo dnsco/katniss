@@ -3,9 +3,8 @@ use std::io::ErrorKind::InvalidData;
 use std::io::{Error, ErrorKind, Result};
 
 use arrow_array::builder::*;
-use arrow_array::{Array, RecordBatch};
+use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
-use prost_reflect::prost_types::Struct;
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 
 /// Parse messages and return RecordBatch
@@ -48,42 +47,31 @@ impl RecordBatchConverter {
     /// Create the appropriate ArrayBuilder for the given field and capacity
     fn make_builder(field: &Field, capacity: usize) -> Box<dyn ArrayBuilder> {
         // arrow needs generic builder methods
-        let (inner_typ, is_large_list) = match field.data_type() {
-            DataType::List(v) => (v.data_type(), Some(false)),
-            DataType::LargeList(v) => (v.data_type(), Some(true)),
-            _ => (field.data_type(), None),
+        let (inner_typ, kind) = match field.data_type() {
+            DataType::List(v) => (v.data_type(), ListKind::List),
+            DataType::LargeList(v) => (v.data_type(), ListKind::LargeList),
+            _ => (field.data_type(), ListKind::NotList),
         };
+
         match inner_typ {
-            DataType::Boolean => {
-                wrap_builder(BooleanBuilder::with_capacity(capacity), is_large_list)
+            DataType::Boolean => wrap_builder(BooleanBuilder::with_capacity(capacity), kind),
+            DataType::Int32 => wrap_builder(Int32Builder::with_capacity(capacity), kind),
+            DataType::Int64 => wrap_builder(Int64Builder::with_capacity(capacity), kind),
+            DataType::UInt32 => wrap_builder(UInt32Builder::with_capacity(capacity), kind),
+            DataType::UInt64 => wrap_builder(UInt64Builder::with_capacity(capacity), kind),
+            DataType::Float32 => wrap_builder(Float32Builder::with_capacity(capacity), kind),
+            DataType::Float64 => wrap_builder(Float64Builder::with_capacity(capacity), kind),
+            DataType::Binary => wrap_builder(BinaryBuilder::with_capacity(capacity, 1024), kind),
+            DataType::LargeBinary => {
+                wrap_builder(LargeBinaryBuilder::with_capacity(capacity, 1024), kind)
             }
-            DataType::Int32 => wrap_builder(Int32Builder::with_capacity(capacity), is_large_list),
-            DataType::Int64 => wrap_builder(Int64Builder::with_capacity(capacity), is_large_list),
-            DataType::UInt32 => wrap_builder(UInt32Builder::with_capacity(capacity), is_large_list),
-            DataType::UInt64 => wrap_builder(UInt64Builder::with_capacity(capacity), is_large_list),
-            DataType::Float32 => {
-                wrap_builder(Float32Builder::with_capacity(capacity), is_large_list)
+            DataType::Utf8 => wrap_builder(StringBuilder::with_capacity(capacity, 1024), kind),
+            DataType::LargeUtf8 => {
+                wrap_builder(LargeStringBuilder::with_capacity(capacity, 1024), kind)
             }
-            DataType::Float64 => {
-                wrap_builder(Float64Builder::with_capacity(capacity), is_large_list)
-            }
-            DataType::Binary => {
-                wrap_builder(BinaryBuilder::with_capacity(capacity, 1024), is_large_list)
-            }
-            DataType::LargeBinary => wrap_builder(
-                LargeBinaryBuilder::with_capacity(capacity, 1024),
-                is_large_list,
-            ),
-            DataType::Utf8 => {
-                wrap_builder(StringBuilder::with_capacity(capacity, 1024), is_large_list)
-            }
-            DataType::LargeUtf8 => wrap_builder(
-                LargeStringBuilder::with_capacity(capacity, 1024),
-                is_large_list,
-            ),
             DataType::Struct(fields) => wrap_builder(
                 RecordBatchConverter::make_struct_builder(fields.clone(), capacity),
-                is_large_list,
+                kind,
             ),
             t => panic!("Data type {:?} is not currently supported", t),
         }
@@ -94,18 +82,19 @@ impl RecordBatchConverter {
     }
 }
 
+enum ListKind {
+    List,
+    LargeList,
+    NotList,
+}
+
 /// Return the boxed builder or wrap it in a ListBuilder then box
 /// this is necessary because
-fn wrap_builder<T: ArrayBuilder>(builder: T, is_large_list: Option<bool>) -> Box<dyn ArrayBuilder> {
-    match is_large_list {
-        Some(is_large_list) => {
-            if is_large_list {
-                Box::new(LargeListBuilder::new(builder))
-            } else {
-                Box::new(ListBuilder::new(builder))
-            }
-        }
-        _ => Box::new(builder),
+fn wrap_builder<T: ArrayBuilder>(builder: T, kind: ListKind) -> Box<dyn ArrayBuilder> {
+    match kind {
+        ListKind::List => Box::new(ListBuilder::new(builder)),
+        ListKind::LargeList => Box::new(LargeListBuilder::new(builder)),
+        ListKind::NotList => Box::new(builder),
     }
 }
 
@@ -253,17 +242,15 @@ fn append_list_value(
     i: usize,
     value_option: Option<&[Value]>,
 ) -> Result<()> {
-    let (inner_typ, is_large_list) = match f.data_type() {
-        DataType::List(v) => (v.data_type(), Some(false)),
-        DataType::LargeList(v) => (v.data_type(), Some(true)),
-        _ => {
+    let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type()  else {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "append_list_value got a non-list field",
             ))
-        }
+
     };
-    match inner_typ {
+
+    match inner.data_type() {
         DataType::Float64 => set_list_val!(builder, i, Float64Builder, value_option, as_f64, f64),
         DataType::Float32 => set_list_val!(builder, i, Float32Builder, value_option, as_f32, f32),
         DataType::Int64 => {
@@ -304,6 +291,6 @@ fn append_list_value(
             }
             Ok(())
         }
-        _ => unimplemented!("Unsupported inner_typ {}", inner_typ),
+        inner_type => unimplemented!("Unsupported inner_type {}", inner_type),
     }
 }
