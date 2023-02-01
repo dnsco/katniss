@@ -127,28 +127,28 @@ fn finish<T: ArrayBuilder>(
     i: usize,
     nlevels: i32,
 ) -> Result<ArrayRef> {
-    if nlevels == 0 {
-        let b = builder.field_builder::<T>(i).unwrap();
-        Ok(Arc::new(b.finish()) as ArrayRef)
-    } else if nlevels == 1 {
-        let b = builder.field_builder::<ListBuilder<T>>(i).unwrap();
-        Ok(Arc::new(b.finish()) as ArrayRef)
-    } else if nlevels == 2 {
-        let b = builder
+    let b: &mut dyn ArrayBuilder = match nlevels {
+        0 => builder.field_builder::<T>(i).unwrap(),
+        1 => builder.field_builder::<ListBuilder<T>>(i).unwrap(),
+        2 => builder
             .field_builder::<ListBuilder<ListBuilder<T>>>(i)
-            .unwrap();
-        Ok(Arc::new(b.finish()) as ArrayRef)
-    } else if nlevels == 3 {
-        let b = builder
+            .unwrap(),
+        3 => builder
             .field_builder::<ListBuilder<ListBuilder<ListBuilder<T>>>>(i)
-            .unwrap();
-        Ok(Arc::new(b.finish()) as ArrayRef)
-    } else {
-        Err(Error::new(
+            .unwrap(),
+        4 => builder
+            .field_builder::<ListBuilder<ListBuilder<ListBuilder<ListBuilder<T>>>>>(i)
+            .unwrap(),
+        5 => builder
+            .field_builder::<ListBuilder<ListBuilder<ListBuilder<ListBuilder<ListBuilder<T>>>>>>(i)
+            .unwrap(),
+        _ => Err(Error::new(
             InvalidData,
             "Dafuq you doing with this matryoshka doll",
-        ))
-    }
+        ))?,
+    };
+
+    Ok(Arc::new(b.finish()))
 }
 
 fn get_list_levels(f: &Field) -> (&DataType, i32) {
