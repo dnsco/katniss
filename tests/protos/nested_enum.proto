@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package eto.pb2arrow.tests;
+
+message MessageWithNestedEnum {
+	Status status = 1;	
+}
+
+enum Status {
+    PASSSING = 0;
+    FAILING = 1;
+    LEGACY = 2;
+}
