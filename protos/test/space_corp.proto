@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package eto.pb2arrow.spacecorp_tests;
+
+
+// Generic Wrapper struct that holds a reading for a component at a point in time
+message Packet {
+    Timestamp timestamp = 1;
+    // id of the component that sends this
+    uint64 sender_uid = 2;
+
+    // Begin numbering here at 100 in case we have to add packet-general fields
+    oneof msg {
+        JumpDriveControl jump_drive_control = 100;
+        JumpDriveStatus jump_drive_status = 101;
+        ClimateControl climate_control = 102;
+        ClimateStatus climate_status = 103;
+    }
+}
+
+// This is copypasta'ed from google well known types Timestamp,
+// it would be good to:
+// support well known types converstion to appropriate datetime time
+// support arbitrary conversions to get data in correct arrow format
+message Timestamp {
+    // Represents seconds of UTC time since Unix epoch
+    int64 seconds = 1;
+
+    // Non-negative fractions of a second at nanosecond resolution.
+    int32 nanos = 2;
+  }
+
+
+message JumpDriveControl {
+    GalacticCoordinate target = 1;
+    JumpDriveMode requested_mode = 2;
+}
+
+message JumpDriveStatus {
+    GalacticCoordinate target = 1;
+    JumpDriveMode mode = 2;
+    repeated QuantumSpaceTimeReading history = 3;
+}
+
+enum JumpDriveMode {
+    OFF = 0;
+    HYPERDRIVE_WARMING = 1;
+    HYPERDRIVE_ENGAGED = 2;
+    // Is this thing a 386?
+    XENODRIVE_ACCELERATING = 3;
+
+    // Errors
+    OUT_OF_DILITHIUM = 100;
+    PHASE_SHIFTED = 101;
+}
+
+message GalacticCoordinate {
+    int64 x = 1;
+    int64 y = 2;
+}
+
+message QuantumSpaceTimeReading {
+    GalacticCoordinate coord = 1;
+    // Non-linear vortices
+    Timestamp when = 2;
+    // Harmonic Oscillation Delta
+    repeated double vxs = 3;
+}
+
+message ClimateControl {
+    enum Species {
+        Human = 0;
+        SILURIAN = 1;
+        TIMELORD = 3;
+        CRYSTALINE_ENTITY = 4;
+    }
+
+    uint32 room_id = 1;
+    RoomClimate target = 2;
+    Species target_species = 3;
+}
+
+message ClimateStatus {
+    enum Species {
+        Human = 0;
+        SILURIAN = 1;
+        TIMELORD = 3;
+        CRYSTALINE_ENTITY = 4;
+        // Uh-Oh
+        Q = 100;
+    }
+
+    uint32 room_id = 1;
+    PidControl temperature_controller = 2;
+    PidControl o2_controller = 3;
+    Species species = 4;
+}
+
+message RoomClimate {
+    float t_kelvin = 1;
+    // Percentage from 0.0-100, ~21.2 for earthlike-conditions
+    double o2_percent = 2;
+}
+
+
+// This message is for holding state for generic PID controllers
+// Assume using the 'standard' form of PID
+// e = setpoint - present_value
+// output = Kp * (e + 1/Ti * integral(e) + Td * diff(e) )
+message PidControl {
+    // Controller inputs
+
+    // The goal that we're driving to
+    float setpoint = 1;
+    // The measured process value
+    float present_value = 2;
+
+    // Error terms
+
+    // The difference that the controller is trying to zero
+    float error = 3;
+    // The time integral of the error
+    float error_integral = 4;
+    // The derivative of the error wrt time
+    float error_derivative = 5;
+    // The time since the controller was last run
+    float delta_t_seconds = 6;
+
+    // Gain terms
+
+    // Kp - Gain on the error output
+    float proportional_gain = 7;
+    // Ti - Time constant of the integrator
+    float integrator_tau_seconds = 8;
+    // Td - Time constant of the differentiator
+    float derivative_tau_seconds = 9;
+
+    // Output terms
+
+    // Max rate the output will slew per second
+    float out_slew_limit = 10;
+    // Max output value high
+    float out_limit_hi = 11;
+    // Max output value low
+    float out_limit_lo = 12;
+    // The control value output
+    float out = 13;
+
+    // Switches
+
+    // If true the controller is enabled to run
+    bool enable = 14;
+    // If true, clamp the integrator at the output limits / Kp
+    bool enable_anti_windup = 15;
+    // If true, clamp the output slew rate - also slew limits the integrator
+    bool enable_slew_limiter = 16;
+    // If true the integrator is enabled
+    bool enable_integrator = 17;
+    // If true the differentiator is enabled
+    bool enable_differentiator = 18;
+    // The magnitude of saturation error - the difference bewteen what the
+    // controller wants and the plant can give based on the limits
+    float error_saturation = 19;
+  }
