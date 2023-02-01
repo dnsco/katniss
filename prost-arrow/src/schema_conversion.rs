@@ -107,33 +107,24 @@ impl SchemaConverter {
         }
     }
 
-    pub fn get_arrow_schema_by_short_name(
+    pub fn get_arrow_schemas_by_short_name(
         &self,
         short_name: &str,
         projection: &[&str],
-    ) -> Result<Option<Schema>> {
-        if let Some(m) = self
-            .descriptor_pool
+    ) -> Result<Vec<Option<Schema>>> {
+        self.descriptor_pool
             .all_messages()
-            .find(|m| m.name() == short_name)
-        {
-            dbg!(m.full_name());
-            self.get_arrow_schema(m.full_name(), projection)
-        } else {
-            Ok(None)
-        }
+            .filter(|m| m.name() == short_name)
+            .map(|m| self.get_arrow_schema(m.full_name(), projection))
+            .collect()
     }
 
-    pub fn get_message_short_name(&self, short_name: &str) -> Option<MessageDescriptor> {
-        if let Some(m) = self
-            .descriptor_pool
+    pub fn get_messages_from_short_name(&self, short_name: &str) -> Vec<Option<MessageDescriptor>> {
+        self.descriptor_pool
             .all_messages()
-            .find(|m| m.name() == short_name)
-        {
-            self.descriptor_pool.get_message_by_name(m.full_name())
-        } else {
-            None
-        }
+            .filter(|m| m.name() == short_name)
+            .map(|m| self.descriptor_pool.get_message_by_name(m.full_name()))
+            .collect()
     }
 }
 

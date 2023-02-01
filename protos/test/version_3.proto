@@ -17,6 +17,7 @@ message Bar {
 	bool b = 2;
 	double d = 3;
 	Struct s = 4;
+	bool v3_only = 5;
 }
 
 message MessageWithNestedEnum {

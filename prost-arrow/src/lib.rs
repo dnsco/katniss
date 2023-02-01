@@ -70,13 +70,23 @@ mod tests {
 
         let converter = converter_for(proto_file);
         let schema = converter
-            .get_arrow_schema_by_short_name(short_name, projection)
+            .get_arrow_schemas_by_short_name(short_name, projection)
             .unwrap()
+            .remove(0)
             .unwrap();
 
         let mut c = RecordBatchConverter::new(SchemaRef::from(schema.clone()), 10);
-        let desc = converter.get_message_short_name(short_name).unwrap();
-        let struct_desc = converter.get_message_short_name("Struct").unwrap();
+
+        let desc = converter
+            .get_messages_from_short_name(short_name)
+            .remove(0)
+            .unwrap();
+
+        let struct_desc = converter
+            .get_messages_from_short_name("Struct")
+            .remove(0)
+            .unwrap();
+
         for i in 0..2 {
             let mut msg = DynamicMessage::new(desc.clone());
             let mut s = DynamicMessage::new(struct_desc.clone());
