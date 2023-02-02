@@ -155,47 +155,47 @@ fn append_list_value(
     match inner.data_type() {
         DataType::Float64 => extend_builder(
             field_builder::<ListBuilder<Float64Builder>>(struct_builder, i),
-            parse_list(values, Value::as_f64),
+            parse_list(values, Value::as_f64)?,
         ),
         DataType::Float32 => extend_builder(
             field_builder::<ListBuilder<Float32Builder>>(struct_builder, i),
-            parse_list(values, Value::as_f32),
+            parse_list(values, Value::as_f32)?,
         ),
         DataType::Int64 => extend_builder(
             field_builder::<ListBuilder<Int64Builder>>(struct_builder, i),
-            parse_list(values, Value::as_i64),
+            parse_list(values, Value::as_i64)?,
         ),
         DataType::Int32 => extend_builder(
             field_builder::<ListBuilder<Int32Builder>>(struct_builder, i),
-            parse_list(values, Value::as_i32),
+            parse_list(values, Value::as_i32)?,
         ),
         DataType::UInt64 => extend_builder(
             field_builder::<ListBuilder<UInt64Builder>>(struct_builder, i),
-            parse_list(values, Value::as_u64),
+            parse_list(values, Value::as_u64)?,
         ),
         DataType::UInt32 => extend_builder(
             field_builder::<ListBuilder<UInt32Builder>>(struct_builder, i),
-            parse_list(values, Value::as_u32),
+            parse_list(values, Value::as_u32)?,
         ),
         DataType::Utf8 => extend_builder(
             field_builder::<ListBuilder<StringBuilder>>(struct_builder, i),
-            parse_list(values, Value::as_str),
+            parse_list(values, Value::as_str)?,
         ),
         DataType::LargeUtf8 => extend_builder(
             field_builder::<ListBuilder<LargeStringBuilder>>(struct_builder, i),
-            parse_list(values, Value::as_str),
+            parse_list(values, Value::as_str)?,
         ),
         DataType::Binary => extend_builder(
             field_builder::<ListBuilder<BinaryBuilder>>(struct_builder, i),
-            parse_list(values, Value::as_bytes),
+            parse_list(values, Value::as_bytes)?,
         ),
         DataType::LargeBinary => extend_builder(
             field_builder::<ListBuilder<LargeBinaryBuilder>>(struct_builder, i),
-            parse_list(values, Value::as_bytes),
+            parse_list(values, Value::as_bytes)?,
         ),
         DataType::Boolean => extend_builder(
             field_builder::<ListBuilder<BooleanBuilder>>(struct_builder, i),
-            parse_list(values, Value::as_bool),
+            parse_list(values, Value::as_bool)?,
         ),
         DataType::Dictionary(_, _) => {
             let kind = field_descriptor.kind();
@@ -243,7 +243,7 @@ fn field_builder<T: ArrayBuilder>(builder: &mut StructBuilder, i: usize) -> &mut
 
 fn parse_val<'val, 'ret: 'val, R, F>(value: Option<&'val Value>, getter: F) -> Result<Option<R>>
 where
-    F: FnOnce(&'val Value) -> Option<R> + 'ret,
+    F: Fn(&'val Value) -> Option<R> + 'ret,
 {
     value
         .map(|v| getter(v).ok_or_else(|| ProstArrowError::TypeCastError(v.clone())))
@@ -253,20 +253,21 @@ where
 fn parse_list<'val, 'ret: 'val, F, R>(
     values: Option<&'val [Value]>,
     getter: F,
-) -> Option<Vec<Option<R>>>
+) -> Result<Option<Vec<Option<R>>>>
 where
     R: std::fmt::Debug,
-    F: FnMut(&'val Value) -> Option<R> + 'ret,
+    F: Fn(&'val Value) -> Option<R> + 'ret,
 {
-    values.map(|vs| {
-        vs.iter()
-            .map(getter)
-            .map(|v| match v {
-                Some(v) => Some(v),
-                None => panic!("parse_errorlolol"),
-            })
-            .collect::<Vec<Option<R>>>()
-    })
+    values
+        .map(|vs| {
+            vs.iter()
+                .map(|v| match getter(v) {
+                    Some(v) => Ok(Some(v)),
+                    None => Err(ProstArrowError::TypeCastError(v.clone())),
+                })
+                .collect::<Result<Vec<_>>>()
+        })
+        .transpose()
 }
 
 fn extend_builder<B, V>(builder: &mut B, val: V) -> Result<()>
