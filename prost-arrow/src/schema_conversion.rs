@@ -20,7 +20,18 @@ pub struct SchemaConverter {
 /// Convert prost FieldDescriptor to arrow Field
 fn to_arrow(f: &FieldDescriptor) -> Result<Field> {
     let name = f.name();
-    let mut data_type = match f.kind() {
+    let data_type = kind_to_type(f.kind())?;
+    if f.is_list() {
+        let item = Box::new(Field::new("item", data_type, true));
+        Ok(Field::new(name, DataType::List(item), true))
+    } else {
+        Ok(Field::new(name, data_type, true))
+    }
+}
+
+/// Convert protobuf data type to arrow data type
+fn kind_to_type(kind: prost_reflect::Kind) -> Result<DataType> {
+    Ok(match kind {
         prost_reflect::Kind::Double => DataType::Float64,
         prost_reflect::Kind::Float => DataType::Float32,
         prost_reflect::Kind::Int32 => DataType::Int32,
@@ -39,12 +50,12 @@ fn to_arrow(f: &FieldDescriptor) -> Result<Field> {
         prost_reflect::Kind::Message(msg) => {
             DataType::Struct(msg.fields().map(|f| to_arrow(&f)).collect::<Result<_>>()?)
         }
-        prost_reflect::Kind::Enum(_) => DataType::Int32,
-    };
-    if f.is_list() {
-        data_type = DataType::List(Box::new(Field::new("item", data_type, true)));
-    }
-    Ok(Field::new(name, data_type, true))
+        prost_reflect::Kind::Enum(_) => {
+            let key_type = Box::new(DataType::Int32);
+            let value_type = Box::new(DataType::Utf8);
+            DataType::Dictionary(key_type, value_type)
+        },
+    })
 }
 
 impl SchemaConverter {

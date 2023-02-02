@@ -52,10 +52,11 @@ mod tests {
             .get_arrow_schema("eto.pb2arrow.tests.v3.MessageWithNestedEnum", &[])?
             .expect("no schema found");
         let schema = SchemaRef::new(schema);
+        assert_eq!(schema.field_with_name("status").unwrap().data_type().clone(),
+                   DataType::Dictionary(Box::new(DataType::Int32),
+                                        Box::new(DataType::Utf8)));
 
         RecordBatchConverter::new(schema, 1);
-
-        // dbg!(schema);
         Ok(())
     }
 
