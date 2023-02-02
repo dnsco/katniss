@@ -37,12 +37,13 @@ fn make_builder(field: &Field, capacity: usize) -> Box<dyn ArrayBuilder> {
         DataType::Utf8 => wrap_builder(StringBuilder::with_capacity(capacity, 1024), kind),
         DataType::LargeUtf8 => {
             wrap_builder(LargeStringBuilder::with_capacity(capacity, 1024), kind)
-        },
+        }
         DataType::Dictionary(_, _) => {
             // Protobuf enums are int32 -> string
-            let dict_builder = StringDictionaryBuilder::<Int32Type>::with_capacity(capacity, capacity, capacity);
+            let dict_builder =
+                StringDictionaryBuilder::<Int32Type>::with_capacity(capacity, capacity, capacity);
             wrap_builder(dict_builder, kind)
-        },
+        }
         DataType::Struct(fields) => {
             wrap_builder(make_struct_builder(fields.clone(), capacity), kind)
         }

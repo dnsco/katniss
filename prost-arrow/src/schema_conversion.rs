@@ -54,7 +54,7 @@ fn kind_to_type(kind: prost_reflect::Kind) -> Result<DataType> {
             let key_type = Box::new(DataType::Int32);
             let value_type = Box::new(DataType::Utf8);
             DataType::Dictionary(key_type, value_type)
-        },
+        }
     })
 }
 

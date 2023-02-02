@@ -1,11 +1,11 @@
 use arrow_array::builder::*;
 use arrow_array::types::Int32Type;
+use arrow_schema::ArrowError::IoError;
 use arrow_schema::{DataType, Field};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 use std::io::ErrorKind::{InvalidData, NotFound};
 use std::io::{Error, ErrorKind, Result};
 use std::ops::Deref;
-use arrow_schema::ArrowError::IoError;
 
 pub fn append_all_fields(
     fields: &Vec<Field>,
@@ -36,7 +36,7 @@ fn append_field(
     let is_missing_field = desc.supports_presence() && !msg.has_field_by_name(name);
     match f.data_type() {
         DataType::List(_) | DataType::LargeList(_) => append_list_value(f, builder, i, msg),
-        _ => append_non_list_value(f, builder, i, msg)
+        _ => append_non_list_value(f, builder, i, msg),
     }
 }
 
@@ -69,11 +69,17 @@ fn append_non_list_value(
     f: &Field,
     struct_builder: &mut StructBuilder,
     i: usize,
-    msg: &DynamicMessage
-) -> Result<()>
-{
-    let field_descriptor = msg.descriptor().get_field_by_name(f.name())
-        .ok_or_else(|| Error::new(NotFound, format!("Could not find descriptor for {}", f.name())))?;
+    msg: &DynamicMessage,
+) -> Result<()> {
+    let field_descriptor = msg
+        .descriptor()
+        .get_field_by_name(f.name())
+        .ok_or_else(|| {
+            Error::new(
+                NotFound,
+                format!("Could not find descriptor for {}", f.name()),
+            )
+        })?;
     let value_option = msg.get_field_by_name(f.name());
     let val = if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
         None
@@ -130,26 +136,28 @@ fn append_non_list_value(
             let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
 
             let kind = field_descriptor.kind();
-            let enum_descriptor = kind.as_enum()
+            let enum_descriptor = kind
+                .as_enum()
                 .ok_or_else(|| Error::new(InvalidData, "field was not an enum"))?;
             let intval = val.map(|v| v.as_i32()).flatten();
             match intval {
                 Some(intval) => {
-                    let enum_value = enum_descriptor.get_value(intval)
-                        .ok_or_else(|| Error::new(InvalidData, format!("No enum value for {intval}")))?;
+                    let enum_value = enum_descriptor.get_value(intval).ok_or_else(|| {
+                        Error::new(InvalidData, format!("No enum value for {intval}"))
+                    })?;
                     f.append(enum_value.name())
                         .map_err(|err| Error::new(InvalidData, err.to_string()))?;
                 }
-                None => f.append_null()
+                None => f.append_null(),
             }
-        },
+        }
         DataType::Struct(nested_fields) => {
             let b = field_builder::<StructBuilder>(struct_builder, i);
             match val {
                 Some(v) => append_all_fields(&nested_fields, b, v.as_message())?,
                 None => b.append_null(),
             }
-        },
+        }
         _ => unimplemented!(
             "{}",
             format!("Unsupported field {} with type {}", f.name(), f.data_type())
@@ -189,17 +197,24 @@ fn append_list_value(
     f: &Field,
     struct_builder: &mut StructBuilder,
     i: usize,
-    msg: &DynamicMessage
+    msg: &DynamicMessage,
 ) -> Result<()> {
-
-    let field_descriptor = msg.descriptor().get_field_by_name(f.name())
-        .ok_or_else(|| Error::new(NotFound, format!("Could not find descriptor for {}", f.name())))?;
+    let field_descriptor = msg
+        .descriptor()
+        .get_field_by_name(f.name())
+        .ok_or_else(|| {
+            Error::new(
+                NotFound,
+                format!("Could not find descriptor for {}", f.name()),
+            )
+        })?;
     let cow = msg.get_field_by_name(f.name()).unwrap(); // already checked by field descriptor get
-    let values: Option<&[Value]> = if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
-        None
-    } else {
-        cow.as_list()
-    };
+    let values: Option<&[Value]> =
+        if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
+            None
+        } else {
+            cow.as_list()
+        };
 
     let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type()  else {
         return Err(Error::new(
@@ -256,16 +271,16 @@ fn append_list_value(
         ),
         DataType::Dictionary(_, _) => {
             let kind = field_descriptor.kind();
-            let enum_descriptor = kind.as_enum()
+            let enum_descriptor = kind
+                .as_enum()
                 .ok_or_else(|| Error::new(InvalidData, "field was not an enum"))?;
-            let f: &mut ListBuilder<StringDictionaryBuilder<Int32Type>> = field_builder(struct_builder, i);
+            let f: &mut ListBuilder<StringDictionaryBuilder<Int32Type>> =
+                field_builder(struct_builder, i);
             let val_lst: Option<Vec<Option<String>>> = values.map(|vs| {
                 vs.iter()
                     .map(Value::as_i32)
                     .map(|v| match v {
-                        Some(v) => {
-                            enum_descriptor.get_value(v).map(|v| v.name().to_string())
-                        }
+                        Some(v) => enum_descriptor.get_value(v).map(|v| v.name().to_string()),
                         None => panic!("parse_errorlolol"),
                     })
                     .collect::<_>()
@@ -273,7 +288,7 @@ fn append_list_value(
 
             f.extend(std::iter::once(val_lst));
             Ok(())
-        },
+        }
         DataType::Struct(nested_fields) => {
             let b: &mut ListBuilder<StructBuilder> = struct_builder.field_builder(i).unwrap();
             match values {
