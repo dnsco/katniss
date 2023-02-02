@@ -10,7 +10,6 @@ use self::builder_creation::make_struct_builder;
 
 mod builder_appending;
 mod builder_creation;
-mod macros;
 
 /// Parse messages and return RecordBatch
 pub struct RecordBatchConverter {

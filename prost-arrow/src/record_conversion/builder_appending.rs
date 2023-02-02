@@ -5,8 +5,6 @@ use std::io::ErrorKind::InvalidData;
 use std::io::{Error, ErrorKind, Result};
 use std::ops::Deref;
 
-use super::macros::*;
-
 pub fn append_all_fields(
     fields: &Vec<Field>,
     builder: &mut StructBuilder,
@@ -160,11 +158,38 @@ where
     Ok(())
 }
 
+fn parse_list<'val, 'ret: 'val, F, R>(
+    values: Option<&'val [Value]>,
+    getter: F,
+) -> Option<Vec<Option<R>>>
+where
+    R: std::fmt::Debug,
+    F: FnMut(&'val Value) -> Option<R> + 'ret,
+{
+    values.map(|vs| {
+        vs.iter()
+            .map(getter)
+            .map(|v| match v {
+                Some(v) => Some(v),
+                None => panic!("parse_errorlolol"),
+            })
+            .collect::<Vec<Option<R>>>()
+    })
+}
+
+fn set_list_values<B, L>(builder: &mut B, vals: L) -> std::result::Result<(), Error>
+where
+    B: Extend<L>,
+{
+    builder.extend(std::iter::once(vals));
+    Ok(())
+}
+
 fn append_list_value(
     f: &Field,
     struct_builder: &mut StructBuilder,
     i: usize,
-    value_option: Option<&[Value]>,
+    values: Option<&[Value]>,
 ) -> Result<()> {
     let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type() else {
         return Err(Error::new(
@@ -174,53 +199,54 @@ fn append_list_value(
     };
 
     match inner.data_type() {
-        DataType::Float64 => {
-            let builder = field_builder::<ListBuilder<Float64Builder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_f64, f64)
-        }
-        DataType::Float32 => {
-            let builder = field_builder::<ListBuilder<Float32Builder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_f32, f32)
-        }
-        DataType::Int64 => {
-            let builder = field_builder::<ListBuilder<Int64Builder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_i64, i64)
-        }
-        DataType::Int32 => {
-            let builder = field_builder::<ListBuilder<Int32Builder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_i32, i32)
-        }
-        DataType::UInt64 => {
-            let builder = field_builder::<ListBuilder<UInt64Builder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_u64, u64)
-        }
-        DataType::UInt32 => {
-            let builder = field_builder::<ListBuilder<UInt32Builder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_u32, u32)
-        }
-        DataType::Utf8 => {
-            let builder = field_builder::<ListBuilder<StringBuilder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_str, &str)
-        }
-        DataType::LargeUtf8 => {
-            let builder = field_builder::<ListBuilder<LargeStringBuilder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_str, &str)
-        }
-        DataType::Binary => {
-            let builder = field_builder::<ListBuilder<BinaryBuilder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_bytes, Bytes)
-        }
-        DataType::LargeBinary => {
-            let builder = field_builder::<ListBuilder<LargeBinaryBuilder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_bytes, Bytes)
-        }
-        DataType::Boolean => {
-            let builder = field_builder::<ListBuilder<BooleanBuilder>>(struct_builder, i);
-            set_list_val!(builder, value_option, as_bool, bool)
-        }
+        DataType::Float64 => set_list_values(
+            field_builder::<ListBuilder<Float64Builder>>(struct_builder, i),
+            parse_list(values, Value::as_f64),
+        ),
+        DataType::Float32 => set_list_values(
+            field_builder::<ListBuilder<Float32Builder>>(struct_builder, i),
+            parse_list(values, Value::as_f32),
+        ),
+        DataType::Int64 => set_list_values(
+            field_builder::<ListBuilder<Int64Builder>>(struct_builder, i),
+            parse_list(values, Value::as_i64),
+        ),
+        DataType::Int32 => set_list_values(
+            field_builder::<ListBuilder<Int32Builder>>(struct_builder, i),
+            parse_list(values, Value::as_i32),
+        ),
+        DataType::UInt64 => set_list_values(
+            field_builder::<ListBuilder<UInt64Builder>>(struct_builder, i),
+            parse_list(values, Value::as_u64),
+        ),
+        DataType::UInt32 => set_list_values(
+            field_builder::<ListBuilder<UInt32Builder>>(struct_builder, i),
+            parse_list(values, Value::as_u32),
+        ),
+        DataType::Utf8 => set_list_values(
+            field_builder::<ListBuilder<StringBuilder>>(struct_builder, i),
+            parse_list(values, Value::as_str),
+        ),
+        DataType::LargeUtf8 => set_list_values(
+            field_builder::<ListBuilder<LargeStringBuilder>>(struct_builder, i),
+            parse_list(values, Value::as_str),
+        ),
+        DataType::Binary => set_list_values(
+            field_builder::<ListBuilder<BinaryBuilder>>(struct_builder, i),
+            parse_list(values, Value::as_bytes),
+        ),
+        DataType::LargeBinary => set_list_values(
+            field_builder::<ListBuilder<LargeBinaryBuilder>>(struct_builder, i),
+            parse_list(values, Value::as_bytes),
+        ),
+
+        DataType::Boolean => set_list_values(
+            field_builder::<ListBuilder<BooleanBuilder>>(struct_builder, i),
+            parse_list(values, Value::as_bool),
+        ),
         DataType::Struct(nested_fields) => {
             let b: &mut ListBuilder<StructBuilder> = struct_builder.field_builder(i).unwrap();
-            match value_option {
+            match values {
                 Some(lst) => {
                     for v in lst {
                         append_all_fields(nested_fields, b.values(), v.as_message())?;
