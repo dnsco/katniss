@@ -43,6 +43,7 @@ fn append_non_list_value(
         .get_field_by_name(f.name())
         .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?;
     let value_option = msg.get_field_by_name(f.name());
+
     let val = if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
         None
     } else {
