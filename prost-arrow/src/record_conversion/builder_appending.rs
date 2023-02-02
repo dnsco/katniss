@@ -162,11 +162,11 @@ where
 
 fn append_list_value(
     f: &Field,
-    builder: &mut StructBuilder,
+    struct_builder: &mut StructBuilder,
     i: usize,
     value_option: Option<&[Value]>,
 ) -> Result<()> {
-    let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type()  else {
+    let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type() else {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             "append_list_value got a non-list field",
@@ -175,39 +175,51 @@ fn append_list_value(
 
     match inner.data_type() {
         DataType::Float64 => {
-            set_list_val!(builder, i, Float64Builder, value_option, as_f64, f64)
+            let builder = field_builder::<ListBuilder<Float64Builder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_f64, f64)
         }
         DataType::Float32 => {
-            set_list_val!(builder, i, Float32Builder, value_option, as_f32, f32)
+            let builder = field_builder::<ListBuilder<Float32Builder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_f32, f32)
         }
         DataType::Int64 => {
-            set_list_val!(builder, i, Int64Builder, value_option, as_i64, i64)
+            let builder = field_builder::<ListBuilder<Int64Builder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_i64, i64)
         }
         DataType::Int32 => {
-            set_list_val!(builder, i, Int32Builder, value_option, as_i32, i32)
+            let builder = field_builder::<ListBuilder<Int32Builder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_i32, i32)
         }
-        DataType::UInt64 => set_list_val!(builder, i, UInt64Builder, value_option, as_u64, u64),
-        DataType::UInt32 => set_list_val!(builder, i, UInt32Builder, value_option, as_u32, u32),
-        DataType::Utf8 => set_list_val!(builder, i, StringBuilder, value_option, as_str, &str),
+        DataType::UInt64 => {
+            let builder = field_builder::<ListBuilder<UInt64Builder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_u64, u64)
+        }
+        DataType::UInt32 => {
+            let builder = field_builder::<ListBuilder<UInt32Builder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_u32, u32)
+        }
+        DataType::Utf8 => {
+            let builder = field_builder::<ListBuilder<StringBuilder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_str, &str)
+        }
         DataType::LargeUtf8 => {
-            set_list_val!(builder, i, LargeStringBuilder, value_option, as_str, &str)
+            let builder = field_builder::<ListBuilder<LargeStringBuilder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_str, &str)
         }
         DataType::Binary => {
-            set_list_val!(builder, i, BinaryBuilder, value_option, as_bytes, Bytes)
+            let builder = field_builder::<ListBuilder<BinaryBuilder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_bytes, Bytes)
         }
-        DataType::LargeBinary => set_list_val!(
-            builder,
-            i,
-            LargeBinaryBuilder,
-            value_option,
-            as_bytes,
-            Bytes
-        ),
+        DataType::LargeBinary => {
+            let builder = field_builder::<ListBuilder<LargeBinaryBuilder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_bytes, Bytes)
+        }
         DataType::Boolean => {
-            set_list_val!(builder, i, BooleanBuilder, value_option, as_bool, bool)
+            let builder = field_builder::<ListBuilder<BooleanBuilder>>(struct_builder, i);
+            set_list_val!(builder, value_option, as_bool, bool)
         }
         DataType::Struct(nested_fields) => {
-            let b: &mut ListBuilder<StructBuilder> = builder.field_builder(i).unwrap();
+            let b: &mut ListBuilder<StructBuilder> = struct_builder.field_builder(i).unwrap();
             match value_option {
                 Some(lst) => {
                     for v in lst {
