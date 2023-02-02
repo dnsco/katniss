@@ -17,7 +17,7 @@ pub enum ProstArrowError {
     NoEnumValue(i32),
 
     #[error("Invalid Enum Value")]
-    InvalidEnumValue(#[from] ArrowError),
+    InvalidEnumValue(ArrowError),
 
     #[error("Attempted to append a list to a non-list field")]
     NonListField,
