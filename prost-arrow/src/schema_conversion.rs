@@ -120,6 +120,12 @@ impl SchemaConverter {
         }
     }
 
+    pub fn get_message_by_name(&self, name: &str) -> Result<MessageDescriptor> {
+        self.descriptor_pool
+            .get_message_by_name(name)
+            .ok_or_else(|| ProstArrowError::DescriptorNotFound(name.to_owned()))
+    }
+
     pub fn get_arrow_schemas_by_short_name(
         &self,
         short_name: &str,

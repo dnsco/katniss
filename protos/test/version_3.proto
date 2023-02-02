@@ -29,3 +29,12 @@ enum SomeRandomEnum {
     FAILING = 1;
     LEGACY = 2;
 }
+
+message SimpleOneOfMessage {
+	string words = 1;
+
+	oneof inner {
+		Foo foo = 2;
+		Bar bar = 3;
+	}
+}

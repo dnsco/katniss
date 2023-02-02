@@ -37,7 +37,10 @@ mod test {
     use prost_reflect::{DynamicMessage, MessageDescriptor};
 
     use super::*;
-    use crate::protos::v3::{MessageWithNestedEnum, SomeRandomEnum};
+    use crate::protos::v3::{
+        simple_one_of_message::Inner, Foo, MessageWithNestedEnum, SimpleOneOfMessage,
+        SomeRandomEnum,
+    };
 
     #[test]
     fn test_enums() -> Result<()> {
@@ -58,6 +61,31 @@ mod test {
         dbg!(batch);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_simple_oneof() -> Result<()> {
+        let simple = SimpleOneOfMessage {
+            words: "hullo".into(),
+            inner: Some(Inner::Foo({
+                Foo {
+                    key: 22,
+                    str_val: "I'm inside yr enum".into(),
+                }
+            })),
+        };
+        dbg!(to_dynamic(
+            simple,
+            "eto.pb2arrow.tests.v3.SimpleOneOfMessage"
+        )?);
+        Ok(())
+    }
+
+    fn to_dynamic<P: Message>(proto: P, message_name: &str) -> Result<DynamicMessage> {
+        let bytes: &[u8] = &proto.encode_to_vec();
+        let desc = schema_converter()?.get_message_by_name(message_name)?;
+        let message = DynamicMessage::decode(desc, bytes)?;
+        Ok(message)
     }
 
     #[test]
