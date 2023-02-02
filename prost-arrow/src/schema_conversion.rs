@@ -2,14 +2,15 @@
 //!
 
 use std::collections::HashSet;
-
-use std::io::{BufReader, Error, ErrorKind, Read, Result};
+use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::Command;
 
 use arrow_schema::{DataType, Field, Schema};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
+
+use crate::{ProstArrowError, Result};
 
 /// Dynamically convert protobuf messages to Arrow table or Schema.
 #[derive(Debug, Clone)]
@@ -74,7 +75,7 @@ impl SchemaConverter {
     pub fn compile(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]) -> Result<Self> {
         let protoc = match which::which("protoc") {
             Ok(path) => path,
-            Err(e) => return Err(Error::new(ErrorKind::NotFound, e.to_string())),
+            Err(e) => return Err(ProstArrowError::ProtocError(e)),
         };
 
         let mut file_descriptor_file = NamedTempFile::new()?;

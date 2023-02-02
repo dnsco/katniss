@@ -1,8 +1,12 @@
 //! Convert Protobuf schema and message into Apache Arrow Schema and Tables.
 //!
+//!
+
+mod errors;
 mod record_conversion;
 mod schema_conversion;
 
+pub use errors::{ProstArrowError, Result};
 pub use record_conversion::RecordBatchConverter;
 pub use schema_conversion::SchemaConverter;
 
@@ -16,7 +20,6 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema, SchemaRef};
     use prost_reflect::{DynamicMessage, Value};
 
-    use std::io::Result;
     use std::path::PathBuf;
     use std::sync::Arc;
 

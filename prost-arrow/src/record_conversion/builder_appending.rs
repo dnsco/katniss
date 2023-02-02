@@ -1,11 +1,9 @@
 use arrow_array::builder::*;
 use arrow_array::types::Int32Type;
-use arrow_schema::ArrowError::IoError;
 use arrow_schema::{DataType, Field};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
-use std::io::ErrorKind::{InvalidData, NotFound};
-use std::io::{Error, ErrorKind, Result};
-use std::ops::Deref;
+
+use crate::{ProstArrowError, Result};
 
 pub fn append_all_fields(
     fields: &Vec<Field>,
@@ -28,12 +26,6 @@ fn append_field(
     msg: &DynamicMessage,
     builder: &mut StructBuilder,
 ) -> Result<()> {
-    let name = f.name();
-    let desc = msg
-        .descriptor()
-        .get_field_by_name(name)
-        .ok_or_else(|| Error::new(InvalidData, format!("Field {name} not found")))?;
-    let is_missing_field = desc.supports_presence() && !msg.has_field_by_name(name);
     match f.data_type() {
         DataType::List(_) | DataType::LargeList(_) => append_list_value(f, builder, i, msg),
         _ => append_non_list_value(f, builder, i, msg),
@@ -54,12 +46,7 @@ where
     F: FnOnce(&'val Value) -> Option<R> + 'ret,
 {
     let v = value
-        .map(|v| {
-            getter(v).ok_or_else(|| {
-                let msg = format!("Could not cast {} to correct type", v);
-                Error::new(InvalidData, msg)
-            })
-        })
+        .map(|v| getter(v).ok_or_else(|| ProstArrowError::TypeCastError(v.clone())))
         .transpose()?;
     builder.extend(std::iter::once(v));
     Ok(())
@@ -74,12 +61,7 @@ fn append_non_list_value(
     let field_descriptor = msg
         .descriptor()
         .get_field_by_name(f.name())
-        .ok_or_else(|| {
-            Error::new(
-                NotFound,
-                format!("Could not find descriptor for {}", f.name()),
-            )
-        })?;
+        .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?;
     let value_option = msg.get_field_by_name(f.name());
     let val = if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
         None
@@ -138,15 +120,15 @@ fn append_non_list_value(
             let kind = field_descriptor.kind();
             let enum_descriptor = kind
                 .as_enum()
-                .ok_or_else(|| Error::new(InvalidData, "field was not an enum"))?;
+                .ok_or_else(|| ProstArrowError::NonEnumField)?;
             let intval = val.map(|v| v.as_i32()).flatten();
             match intval {
                 Some(intval) => {
-                    let enum_value = enum_descriptor.get_value(intval).ok_or_else(|| {
-                        Error::new(InvalidData, format!("No enum value for {intval}"))
-                    })?;
+                    let enum_value = enum_descriptor
+                        .get_value(intval)
+                        .ok_or_else(|| ProstArrowError::NoEnumValue(intval))?;
                     f.append(enum_value.name())
-                        .map_err(|err| Error::new(InvalidData, err.to_string()))?;
+                        .map_err(|err| ProstArrowError::InvalidEnumValue(err))?;
                 }
                 None => f.append_null(),
             }
@@ -185,7 +167,7 @@ where
     })
 }
 
-fn set_list_values<B, L>(builder: &mut B, vals: L) -> std::result::Result<(), Error>
+fn set_list_values<B, L>(builder: &mut B, vals: L) -> Result<()>
 where
     B: Extend<L>,
 {
@@ -202,12 +184,8 @@ fn append_list_value(
     let field_descriptor = msg
         .descriptor()
         .get_field_by_name(f.name())
-        .ok_or_else(|| {
-            Error::new(
-                NotFound,
-                format!("Could not find descriptor for {}", f.name()),
-            )
-        })?;
+        .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?;
+
     let cow = msg.get_field_by_name(f.name()).unwrap(); // already checked by field descriptor get
     let values: Option<&[Value]> =
         if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
@@ -217,10 +195,7 @@ fn append_list_value(
         };
 
     let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type()  else {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "append_list_value got a non-list field",
-        ))
+        return Err(ProstArrowError::NonListField)
     };
 
     match inner.data_type() {
@@ -273,7 +248,7 @@ fn append_list_value(
             let kind = field_descriptor.kind();
             let enum_descriptor = kind
                 .as_enum()
-                .ok_or_else(|| Error::new(InvalidData, "field was not an enum"))?;
+                .ok_or_else(|| ProstArrowError::NonEnumField)?;
             let f: &mut ListBuilder<StringDictionaryBuilder<Int32Type>> =
                 field_builder(struct_builder, i);
             let val_lst: Option<Vec<Option<String>>> = values.map(|vs| {

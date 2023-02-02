@@ -1,9 +1,9 @@
-use std::io::Result;
-
 use arrow_array::builder::*;
 use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, SchemaRef};
 use prost_reflect::DynamicMessage;
+
+use crate::Result;
 
 use self::builder_appending::append_all_fields;
 use self::builder_creation::make_struct_builder;
