@@ -93,7 +93,8 @@ impl SchemaConverter {
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer)?;
 
-        let pool = DescriptorPool::decode(buffer.as_slice()).unwrap();
+        let pool =
+            DescriptorPool::decode(buffer.as_slice()).expect("Failed to decode descriptor pool");
         Ok(Self::new(pool))
     }
 

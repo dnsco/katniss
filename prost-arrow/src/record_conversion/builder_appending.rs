@@ -140,7 +140,9 @@ fn append_list_value(
         .get_field_by_name(f.name())
         .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?;
 
-    let cow = msg.get_field_by_name(f.name()).unwrap(); // already checked by field descriptor get
+    let cow = msg
+        .get_field_by_name(f.name())
+        .expect("already checked by field descriptor get");
     let values: Option<&[Value]> =
         if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
             None
@@ -148,7 +150,7 @@ fn append_list_value(
             cow.as_list()
         };
 
-    let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type()  else {
+    let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type() else {
         return Err(ProstArrowError::NonListField)
     };
 
@@ -218,7 +220,7 @@ fn append_list_value(
             Ok(())
         }
         DataType::Struct(nested_fields) => {
-            let b: &mut ListBuilder<StructBuilder> = struct_builder.field_builder(i).unwrap();
+            let b = field_builder::<ListBuilder<StructBuilder>>(struct_builder, i);
             match values {
                 Some(lst) => {
                     for v in lst {
@@ -227,6 +229,9 @@ fn append_list_value(
                     b.append(true);
                 }
                 None => {
+                    // I'm really curious about append_all_fields None,
+                    // Must we append all child fields or can we lift the null higher?
+                    // In that case append_all_fields could just take a DynamicMessage rather than an Option
                     append_all_fields(nested_fields, b.values(), None)?;
                     b.append(false);
                 }
@@ -238,7 +243,7 @@ fn append_list_value(
 }
 
 fn field_builder<T: ArrayBuilder>(builder: &mut StructBuilder, i: usize) -> &mut T {
-    builder.field_builder(i).unwrap()
+    builder.field_builder(i).expect("schema conversion error?")
 }
 
 fn parse_val<'val, 'ret: 'val, R, F>(value: Option<&'val Value>, getter: F) -> Result<Option<R>>
