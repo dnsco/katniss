@@ -1,10 +1,9 @@
-use std::io::ErrorKind::InvalidData;
-use std::io::{Error, ErrorKind, Result};
-use std::ops::Deref;
-
 use arrow_array::builder::*;
 use arrow_schema::{DataType, Field};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
+use std::io::ErrorKind::InvalidData;
+use std::io::{Error, ErrorKind, Result};
+use std::ops::Deref;
 
 use super::macros::*;
 
@@ -59,32 +58,95 @@ fn append_field(
     }
 }
 
-fn append_non_list_value<V: Deref<Target = Value> + std::fmt::Display>(
+fn field_builder<T: ArrayBuilder>(builder: &mut StructBuilder, i: usize) -> &mut T {
+    builder.field_builder(i).unwrap()
+}
+
+fn set_val<'val, 'ret: 'val, T, R, F>(
+    builder: &mut T,
+    value: Option<&'val Value>,
+    getter: F,
+) -> Result<()>
+where
+    T: Extend<Option<R>>,
+    F: FnOnce(&'val Value) -> Option<R> + 'ret,
+{
+    let v = value
+        .map(|v| {
+            getter(v).ok_or_else(|| {
+                let msg = format!("Could not cast {} to correct type", v);
+                Error::new(InvalidData, msg)
+            })
+        })
+        .transpose()?;
+    builder.extend(std::iter::once(v));
+    Ok(())
+}
+
+fn append_non_list_value<V>(
     f: &Field,
-    builder: &mut StructBuilder,
+    struct_builder: &mut StructBuilder,
     i: usize,
     value: Option<V>,
-) -> Result<()> {
+) -> Result<()>
+where
+    V: Deref<Target = Value> + std::fmt::Display,
+{
     if let Some(Value::EnumNumber(num)) = value.as_deref() {
-        let b = builder.field_builder::<Int32Builder>(i).unwrap();
+        let b = struct_builder.field_builder::<Int32Builder>(i).unwrap();
         b.append_value(*num);
         return Ok(());
     }
+    let val = value.as_deref();
 
     match f.data_type() {
-        DataType::Float64 => set_value!(builder, i, Float64Builder, as_f64, value),
-        DataType::Float32 => set_value!(builder, i, Float32Builder, as_f32, value),
-        DataType::Int64 => set_value!(builder, i, Int64Builder, as_i64, value),
-        DataType::Int32 => set_value!(builder, i, Int32Builder, as_i32, value),
-        DataType::UInt64 => set_value!(builder, i, UInt64Builder, as_u64, value),
-        DataType::UInt32 => set_value!(builder, i, UInt32Builder, as_u32, value),
-        DataType::Utf8 => set_value!(builder, i, StringBuilder, as_str, value),
-        DataType::LargeUtf8 => set_value!(builder, i, LargeStringBuilder, as_str, value),
-        DataType::Binary => set_value!(builder, i, BinaryBuilder, as_bytes, value),
-        DataType::LargeBinary => set_value!(builder, i, LargeBinaryBuilder, as_bytes, value),
-        DataType::Boolean => set_value!(builder, i, BooleanBuilder, as_bool, value),
+        DataType::Float64 => {
+            let f = field_builder::<Float64Builder>(struct_builder, i);
+            set_val(f, val, Value::as_f64)?
+        }
+        DataType::Float32 => {
+            let f = field_builder::<Float32Builder>(struct_builder, i);
+            set_val(f, val, Value::as_f32)?
+        }
+        DataType::Int64 => {
+            let f = field_builder::<Int64Builder>(struct_builder, i);
+            set_val(f, val, Value::as_i64)?
+        }
+        DataType::Int32 => {
+            let f = field_builder::<Int32Builder>(struct_builder, i);
+            set_val(f, val, Value::as_i32)?
+        }
+        DataType::UInt64 => {
+            let f = field_builder::<UInt64Builder>(struct_builder, i);
+            set_val(f, val, Value::as_u64)?
+        }
+        DataType::UInt32 => {
+            let f = field_builder::<UInt32Builder>(struct_builder, i);
+            set_val(f, val, Value::as_u32)?
+        }
+        DataType::Utf8 => {
+            let f = field_builder::<StringBuilder>(struct_builder, i);
+            set_val(f, val, Value::as_str)?
+        }
+        DataType::LargeUtf8 => {
+            let f = field_builder::<LargeStringBuilder>(struct_builder, i);
+            set_val(f, val, Value::as_str)?
+        }
+        DataType::Binary => {
+            let f = field_builder::<BinaryBuilder>(struct_builder, i);
+            set_val(f, val, Value::as_bytes)?
+        }
+        DataType::LargeBinary => {
+            let f = field_builder::<LargeBinaryBuilder>(struct_builder, i);
+            set_val(f, val, Value::as_bytes)?
+        }
+        DataType::Boolean => {
+            let f = field_builder::<BooleanBuilder>(struct_builder, i);
+            set_val(f, val, Value::as_bool)?
+        }
+
         DataType::Struct(nested_fields) => {
-            let b = builder.field_builder::<StructBuilder>(i).unwrap();
+            let b = field_builder::<StructBuilder>(struct_builder, i);
             match value {
                 Some(v) => append_all_fields(&nested_fields, b, v.as_message())?,
                 None => b.append_null(),
