@@ -19,20 +19,20 @@ pub struct SchemaConverter {
 }
 
 /// Convert prost FieldDescriptor to arrow Field
-fn to_arrow(f: &FieldDescriptor) -> Result<Field> {
+fn to_arrow(f: &FieldDescriptor) -> Vec<Field> {
     let name = f.name();
-    let data_type = kind_to_type(f.kind())?;
+    let data_type = kind_to_type(f.kind());
     if f.is_list() {
         let item = Box::new(Field::new("item", data_type, true));
-        Ok(Field::new(name, DataType::List(item), true))
+        vec![Field::new(name, DataType::List(item), true)]
     } else {
-        Ok(Field::new(name, data_type, true))
+        vec![Field::new(name, data_type, true)]
     }
 }
 
 /// Convert protobuf data type to arrow data type
-fn kind_to_type(kind: prost_reflect::Kind) -> Result<DataType> {
-    Ok(match kind {
+fn kind_to_type(kind: prost_reflect::Kind) -> DataType {
+    match kind {
         prost_reflect::Kind::Double => DataType::Float64,
         prost_reflect::Kind::Float => DataType::Float32,
         prost_reflect::Kind::Int32 => DataType::Int32,
@@ -49,14 +49,14 @@ fn kind_to_type(kind: prost_reflect::Kind) -> Result<DataType> {
         prost_reflect::Kind::String => DataType::Utf8,
         prost_reflect::Kind::Bytes => DataType::Binary,
         prost_reflect::Kind::Message(msg) => {
-            DataType::Struct(msg.fields().map(|f| to_arrow(&f)).collect::<Result<_>>()?)
+            DataType::Struct(msg.fields().map(|f| to_arrow(&f)).flatten().collect())
         }
         prost_reflect::Kind::Enum(_) => {
             let key_type = Box::new(DataType::Int32);
             let value_type = Box::new(DataType::Utf8);
             DataType::Dictionary(key_type, value_type)
         }
-    })
+    }
 }
 
 impl SchemaConverter {
@@ -107,7 +107,8 @@ impl SchemaConverter {
         let schema = Schema::new(
             msg.fields()
                 .map(|f| to_arrow(&f))
-                .collect::<Result<Vec<_>>>()?,
+                .flatten()
+                .collect(),
         );
 
         if projection.is_empty() {
