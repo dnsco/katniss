@@ -1,6 +1,6 @@
 use arrow_array::builder::*;
 use arrow_array::RecordBatch;
-use arrow_schema::{ArrowError, SchemaRef};
+use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
 use prost_reflect::DynamicMessage;
 
 use crate::Result;

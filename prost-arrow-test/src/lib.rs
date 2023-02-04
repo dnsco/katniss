@@ -81,8 +81,8 @@ mod test {
                 .get_arrow_schema(msg_name, &[])?
                 .unwrap(),
         );
-        dbg!(schema.clone());
-        dbg!(dynamic.descriptor().fields().collect::<Vec<_>>());
+        //dbg!(schema.clone());
+        //dbg!(dynamic.descriptor().fields().collect::<Vec<_>>());
 
         let mut converter = RecordBatchConverter::new(schema, 1);
         converter.append_message(&dynamic)?;

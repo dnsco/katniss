@@ -11,9 +11,9 @@ pub fn append_all_fields(
     msg: Option<&DynamicMessage>,
 ) -> Result<()> {
     for (i, field) in fields.iter().enumerate() {
-        append_field(i, field, msg.unwrap(), builder)?;
+        append_field(i, field, msg, builder)?;
     }
-    builder.append(true);
+    builder.append(msg.is_some());
     Ok(())
 }
 
@@ -23,7 +23,7 @@ pub fn append_all_fields(
 fn append_field(
     i: usize,
     f: &Field,
-    msg: &DynamicMessage,
+    msg: Option<&DynamicMessage>,
     builder: &mut StructBuilder,
 ) -> Result<()> {
     match f.data_type() {
@@ -36,15 +36,20 @@ fn append_non_list_value(
     f: &Field,
     struct_builder: &mut StructBuilder,
     i: usize,
-    msg: &DynamicMessage,
+    msg: Option<&DynamicMessage>,
 ) -> Result<()> {
-    let field_descriptor = msg
-        .descriptor()
-        .get_field_by_name(f.name())
-        .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?;
-    let value_option = msg.get_field_by_name(f.name());
+    let fd_option = match msg {
+        Some(msg) => {
+            Some(msg.descriptor().get_field_by_name(f.name())
+                     .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?)
+        }
+        None => None
+    };
+    let value_option = msg.map(|msg| msg.get_field_by_name(f.name())).flatten();
 
-    let val = if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
+    let has_field = msg.map(|msg| msg.has_field_by_name(f.name())).unwrap_or(false);
+    let has_presence = fd_option.clone().map(|fd| fd.supports_presence()).unwrap_or(false);
+    let val = if has_presence && !has_field {
         None
     } else {
         value_option.as_deref()
@@ -98,13 +103,14 @@ fn append_non_list_value(
         DataType::Dictionary(_, _) => {
             let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
 
-            let kind = field_descriptor.kind();
-            let enum_descriptor = kind
-                .as_enum()
-                .ok_or_else(|| ProstArrowError::NonEnumField)?;
             let intval = val.map(|v| v.as_i32()).flatten();
             match intval {
                 Some(intval) => {
+                    let kind = fd_option.unwrap().kind();
+                    let enum_descriptor = kind
+                        .as_enum()
+                        .ok_or_else(|| ProstArrowError::NonEnumField)?;
+
                     let enum_value = enum_descriptor
                         .get_value(intval)
                         .ok_or_else(|| ProstArrowError::NoEnumValue(intval))?;
@@ -118,8 +124,12 @@ fn append_non_list_value(
         DataType::Struct(nested_fields) => {
             let b = field_builder::<StructBuilder>(struct_builder, i);
             match val {
-                Some(v) => append_all_fields(&nested_fields, b, v.as_message())?,
-                None => b.append_null(),
+                Some(v) => {
+                    append_all_fields(&nested_fields, b, v.as_message())?
+                },
+                None => {
+                    append_all_fields(&nested_fields, b, None)?;
+                },
             };
             Ok(())
         }
@@ -134,22 +144,32 @@ fn append_list_value(
     f: &Field,
     struct_builder: &mut StructBuilder,
     i: usize,
-    msg: &DynamicMessage,
+    msg: Option<&DynamicMessage>,
 ) -> Result<()> {
-    let field_descriptor = msg
-        .descriptor()
-        .get_field_by_name(f.name())
-        .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?;
+    let fd_option = match msg {
+        Some(msg) => {
+            Some(msg.descriptor().get_field_by_name(f.name())
+                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?)
+        }
+        None => None
+    };
+    let cow = msg.map(|msg| msg.get_field_by_name(f.name())).flatten();
 
-    let cow = msg
-        .get_field_by_name(f.name())
-        .expect("already checked by field descriptor get");
-    let values: Option<&[Value]> =
-        if field_descriptor.supports_presence() && !msg.has_field_by_name(f.name()) {
+    let has_field = msg.map(|msg| msg.has_field_by_name(f.name())).unwrap_or(false);
+    let has_presence = fd_option.clone().map(|fd| fd.supports_presence()).unwrap_or(false);
+
+    let v: Option<&Value> =
+        if has_presence && !has_field {
             None
         } else {
-            cow.as_list()
+            cow.as_deref()
         };
+
+    let values = if let Some(v) = v {
+        v.as_list()
+    } else {
+        None
+    };
 
     let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type() else {
         return Err(ProstArrowError::NonListField)
@@ -201,7 +221,7 @@ fn append_list_value(
             parse_list(values, Value::as_bool)?,
         ),
         DataType::Dictionary(_, _) => {
-            let kind = field_descriptor.kind();
+            let kind = fd_option.unwrap().kind();
             let enum_descriptor = kind
                 .as_enum()
                 .ok_or_else(|| ProstArrowError::NonEnumField)?;
@@ -211,7 +231,9 @@ fn append_list_value(
                 vs.iter()
                     .map(Value::as_i32)
                     .map(|v| match v {
-                        Some(v) => enum_descriptor.get_value(v).map(|v| v.name().to_string()),
+                        Some(v) => {
+                            enum_descriptor.get_value(v).map(|v| v.name().to_string())
+                        },
                         None => panic!("parse_errorlolol"),
                     })
                     .collect::<_>()
