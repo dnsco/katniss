@@ -39,16 +39,22 @@ fn append_non_list_value(
     msg: Option<&DynamicMessage>,
 ) -> Result<()> {
     let fd_option = match msg {
-        Some(msg) => {
-            Some(msg.descriptor().get_field_by_name(f.name())
-                     .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?)
-        }
-        None => None
+        Some(msg) => Some(
+            msg.descriptor()
+                .get_field_by_name(f.name())
+                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?,
+        ),
+        None => None,
     };
     let value_option = msg.map(|msg| msg.get_field_by_name(f.name())).flatten();
 
-    let has_field = msg.map(|msg| msg.has_field_by_name(f.name())).unwrap_or(false);
-    let has_presence = fd_option.clone().map(|fd| fd.supports_presence()).unwrap_or(false);
+    let has_field = msg
+        .map(|msg| msg.has_field_by_name(f.name()))
+        .unwrap_or(false);
+    let has_presence = fd_option
+        .clone()
+        .map(|fd| fd.supports_presence())
+        .unwrap_or(false);
     let val = if has_presence && !has_field {
         None
     } else {
@@ -124,12 +130,10 @@ fn append_non_list_value(
         DataType::Struct(nested_fields) => {
             let b = field_builder::<StructBuilder>(struct_builder, i);
             match val {
-                Some(v) => {
-                    append_all_fields(&nested_fields, b, v.as_message())?
-                },
+                Some(v) => append_all_fields(&nested_fields, b, v.as_message())?,
                 None => {
                     append_all_fields(&nested_fields, b, None)?;
-                },
+                }
             };
             Ok(())
         }
@@ -147,29 +151,30 @@ fn append_list_value(
     msg: Option<&DynamicMessage>,
 ) -> Result<()> {
     let fd_option = match msg {
-        Some(msg) => {
-            Some(msg.descriptor().get_field_by_name(f.name())
-                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?)
-        }
-        None => None
+        Some(msg) => Some(
+            msg.descriptor()
+                .get_field_by_name(f.name())
+                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?,
+        ),
+        None => None,
     };
     let cow = msg.map(|msg| msg.get_field_by_name(f.name())).flatten();
 
-    let has_field = msg.map(|msg| msg.has_field_by_name(f.name())).unwrap_or(false);
-    let has_presence = fd_option.clone().map(|fd| fd.supports_presence()).unwrap_or(false);
+    let has_field = msg
+        .map(|msg| msg.has_field_by_name(f.name()))
+        .unwrap_or(false);
+    let has_presence = fd_option
+        .clone()
+        .map(|fd| fd.supports_presence())
+        .unwrap_or(false);
 
-    let v: Option<&Value> =
-        if has_presence && !has_field {
-            None
-        } else {
-            cow.as_deref()
-        };
-
-    let values = if let Some(v) = v {
-        v.as_list()
-    } else {
+    let v: Option<&Value> = if has_presence && !has_field {
         None
+    } else {
+        cow.as_deref()
     };
+
+    let values = if let Some(v) = v { v.as_list() } else { None };
 
     let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type() else {
         return Err(ProstArrowError::NonListField)
@@ -231,9 +236,7 @@ fn append_list_value(
                 vs.iter()
                     .map(Value::as_i32)
                     .map(|v| match v {
-                        Some(v) => {
-                            enum_descriptor.get_value(v).map(|v| v.name().to_string())
-                        },
+                        Some(v) => enum_descriptor.get_value(v).map(|v| v.name().to_string()),
                         None => panic!("parse_errorlolol"),
                     })
                     .collect::<_>()

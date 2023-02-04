@@ -114,11 +114,7 @@ impl SchemaConverter {
             Some(m) => m,
             None => return Ok(None),
         };
-        let schema = Schema::new(
-            msg.fields()
-                .map(|f| to_arrow(&f))
-                .collect(),
-        );
+        let schema = Schema::new(msg.fields().map(|f| to_arrow(&f)).collect());
 
         if projection.is_empty() {
             Ok(Some(schema))
