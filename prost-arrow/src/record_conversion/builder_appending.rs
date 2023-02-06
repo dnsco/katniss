@@ -38,15 +38,15 @@ fn append_non_list_value(
     i: usize,
     msg: Option<&DynamicMessage>,
 ) -> Result<()> {
-    let fd_option = match msg {
-        Some(msg) => Some(
+    let fd_option = msg
+        .map(|msg| {
             msg.descriptor()
                 .get_field_by_name(f.name())
-                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?,
-        ),
-        None => None,
-    };
-    let value_option = msg.map(|msg| msg.get_field_by_name(f.name())).flatten();
+                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))
+        })
+        .transpose()?;
+
+    let cow = msg.and_then(|msg| msg.get_field_by_name(f.name()));
 
     let has_field = msg
         .map(|msg| msg.has_field_by_name(f.name()))
@@ -58,7 +58,7 @@ fn append_non_list_value(
     let val = if has_presence && !has_field {
         None
     } else {
-        value_option.as_deref()
+        cow.as_deref()
     };
 
     match f.data_type() {
@@ -109,7 +109,7 @@ fn append_non_list_value(
         DataType::Dictionary(_, _) => {
             let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
 
-            let intval = val.map(|v| v.as_i32()).flatten();
+            let intval = val.and_then(|v| v.as_i32());
             match intval {
                 Some(intval) => {
                     let kind = fd_option.unwrap().kind();
@@ -150,15 +150,15 @@ fn append_list_value(
     i: usize,
     msg: Option<&DynamicMessage>,
 ) -> Result<()> {
-    let fd_option = match msg {
-        Some(msg) => Some(
+    let fd_option = msg
+        .map(|msg| {
             msg.descriptor()
                 .get_field_by_name(f.name())
-                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))?,
-        ),
-        None => None,
-    };
-    let cow = msg.map(|msg| msg.get_field_by_name(f.name())).flatten();
+                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))
+        })
+        .transpose()?;
+
+    let cow = msg.and_then(|msg| msg.get_field_by_name(f.name()));
 
     let has_field = msg
         .map(|msg| msg.has_field_by_name(f.name()))

@@ -86,8 +86,8 @@ mod test {
 
         let mut converter = RecordBatchConverter::new(schema, 1);
         converter.append_message(&dynamic)?;
-        let records = converter.records();
-
+        let _records = converter.records();
+        //todo figure out how to assert on records;
         Ok(())
     }
 
