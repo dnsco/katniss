@@ -44,9 +44,12 @@ mod test {
     use prost_reflect::{DynamicMessage, MessageDescriptor};
 
     use super::*;
-    use crate::protos::v3::{
-        simple_one_of_message::Inner, Foo, MessageWithNestedEnum, SimpleOneOfMessage,
-        SomeRandomEnum,
+    use crate::protos::{
+        spacecorp::{packet, ClimateStatus, JumpDriveStatus, Packet},
+        v3::{
+            simple_one_of_message::Inner, Foo, MessageWithNestedEnum, SimpleOneOfMessage,
+            SomeRandomEnum,
+        },
     };
 
     #[test]
@@ -87,10 +90,39 @@ mod test {
         Ok(())
     }
 
-    fn batch_for(
-        msg_name: &str,
-        messages: &[SimpleOneOfMessage],
-    ) -> Result<RecordBatch, anyhow::Error> {
+    #[test]
+    fn test_nested_null_struct() -> Result<()> {
+        let packet = Packet {
+            msg: Some(packet::Msg::ClimateStatus(ClimateStatus::default())),
+            ..Default::default()
+        };
+
+        dbg!(&packet);
+
+        let batch = batch_for("eto.pb2arrow.tests.spacecorp.Packet", &[packet])?;
+        write_batch(batch, "nested_null_struct")?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_heterogenous_batch() -> Result<()> {
+        let packets = [
+            Packet {
+                msg: Some(packet::Msg::ClimateStatus(ClimateStatus::default())),
+                ..Default::default()
+            },
+            Packet {
+                msg: Some(packet::Msg::JumpDriveStatus(JumpDriveStatus::default())),
+                ..Default::default()
+            },
+        ];
+
+        let batch = batch_for("eto.pb2arrow.tests.spacecorp.Packet", &packets)?;
+        write_batch(batch, "nested_null_struct")?;
+        Ok(())
+    }
+
+    fn batch_for<P: Message>(msg_name: &str, messages: &[P]) -> Result<RecordBatch, anyhow::Error> {
         let mut converter = schema_converter()?.converter_for(msg_name, messages.len())?;
         for m in messages {
             converter.append_message(&to_dynamic(m, msg_name)?)?;

@@ -94,6 +94,11 @@ message ClimateStatus {
     PidControl temperature_controller = 2;
     PidControl o2_controller = 3;
     Species species = 4;
+    VortexModulator modulator = 5;
+}
+
+message VortexModulator {
+    PidControl control = 1;
 }
 
 message RoomClimate {
