@@ -10,6 +10,8 @@ pub use errors::{ProstArrowError, Result};
 pub use record_conversion::RecordBatchConverter;
 pub use schema_conversion::SchemaConverter;
 
+pub use arrow_array::RecordBatch;
+
 #[cfg(test)]
 mod tests {
     use super::*;

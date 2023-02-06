@@ -1,6 +1,6 @@
 use arrow_array::builder::*;
 use arrow_array::RecordBatch;
-use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
+use arrow_schema::{ArrowError, SchemaRef};
 use prost_reflect::DynamicMessage;
 
 use crate::Result;
@@ -31,6 +31,10 @@ impl RecordBatchConverter {
     /// Append a new protobuf message to this batch
     pub fn append_message(&mut self, msg: &DynamicMessage) -> Result<()> {
         append_all_fields(self.schema.fields(), &mut self.builder, Some(msg))
+    }
+
+    pub fn schema(&self) -> SchemaRef {
+        self.schema.clone()
     }
 
     /// Number of rows in this batch so far

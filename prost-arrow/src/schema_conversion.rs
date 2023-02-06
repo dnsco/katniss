@@ -6,11 +6,11 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::Command;
 
-use arrow_schema::{DataType, Field, Schema};
+use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
 
-use crate::{ProstArrowError, Result};
+use crate::{ProstArrowError, RecordBatchConverter, Result};
 
 /// Dynamically convert protobuf messages to Arrow table or Schema.
 #[derive(Debug, Clone)]
@@ -106,6 +106,12 @@ impl SchemaConverter {
         let pool =
             DescriptorPool::decode(buffer.as_slice()).expect("Failed to decode descriptor pool");
         Ok(Self::new(pool))
+    }
+
+    pub fn converter_for(&self, name: &str, batch_size: usize) -> Result<RecordBatchConverter> {
+        let schema = self.get_arrow_schema(name, &[])?.unwrap();
+        let schema = SchemaRef::new(schema);
+        Ok(RecordBatchConverter::new(schema, batch_size))
     }
 
     /// Get the arrow schema of the protobuf message, specified by the qualified message name.

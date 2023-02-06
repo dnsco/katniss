@@ -30,11 +30,18 @@ fn descriptor_pool() -> Result<DescriptorPool> {
 
 #[cfg(test)]
 mod test {
+    use std::{
+        fs::File,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use anyhow::{Context, Result};
     use arrow_schema::SchemaRef;
+    use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
     use prost::Message;
-    use prost_arrow::RecordBatchConverter;
-    use prost_reflect::{DynamicMessage, MessageDescriptor, ReflectMessage};
+    use prost_arrow::{RecordBatch, RecordBatchConverter};
+    use prost_reflect::{DynamicMessage, MessageDescriptor};
 
     use super::*;
     use crate::protos::v3::{
@@ -74,24 +81,44 @@ mod test {
                 }
             })),
         };
-        let msg_name = "eto.pb2arrow.tests.v3.SimpleOneOfMessage";
-        let dynamic = to_dynamic(simple, msg_name)?;
-        let schema = SchemaRef::new(
-            schema_converter()?
-                .get_arrow_schema(msg_name, &[])?
-                .unwrap(),
-        );
-        //dbg!(schema.clone());
-        //dbg!(dynamic.descriptor().fields().collect::<Vec<_>>());
 
-        let mut converter = RecordBatchConverter::new(schema, 1);
-        converter.append_message(&dynamic)?;
-        let _records = converter.records();
-        //todo figure out how to assert on records;
+        let batch = batch_for("eto.pb2arrow.tests.v3.SimpleOneOfMessage", &[simple])?;
+        write_batch(batch, "simple_one_of")?;
         Ok(())
     }
 
-    fn to_dynamic<P: Message>(proto: P, message_name: &str) -> Result<DynamicMessage> {
+    fn batch_for(
+        msg_name: &str,
+        messages: &[SimpleOneOfMessage],
+    ) -> Result<RecordBatch, anyhow::Error> {
+        let mut converter = schema_converter()?.converter_for(msg_name, messages.len())?;
+        for m in messages {
+            converter.append_message(&to_dynamic(m, msg_name)?)?;
+        }
+
+        Ok(converter.records()?)
+    }
+
+    fn write_batch(batch: RecordBatch, test_name: &str) -> Result<(), anyhow::Error> {
+        let file = timestamped_data_file(test_name)?;
+        let props = WriterProperties::builder().build();
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))?;
+        writer.write(&batch)?;
+        writer.close()?;
+        Ok(())
+    }
+
+    fn timestamped_data_file(test_name: &str) -> Result<File, anyhow::Error> {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("data");
+        path.push(format!("{test_name}_{now}"));
+        path.set_extension("parquet");
+        let file = File::create(path)?;
+        Ok(file)
+    }
+
+    fn to_dynamic<P: Message>(proto: &P, message_name: &str) -> Result<DynamicMessage> {
         let bytes: &[u8] = &proto.encode_to_vec();
         let desc = schema_converter()?.get_message_by_name(message_name)?;
         let message = DynamicMessage::decode(desc, bytes)?;
