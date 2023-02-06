@@ -34,7 +34,7 @@ mod test {
     use arrow_schema::SchemaRef;
     use prost::Message;
     use prost_arrow::RecordBatchConverter;
-    use prost_reflect::{DynamicMessage, MessageDescriptor};
+    use prost_reflect::{DynamicMessage, MessageDescriptor, ReflectMessage};
 
     use super::*;
     use crate::protos::v3::{
@@ -74,10 +74,20 @@ mod test {
                 }
             })),
         };
-        dbg!(to_dynamic(
-            simple,
-            "eto.pb2arrow.tests.v3.SimpleOneOfMessage"
-        )?);
+        let msg_name = "eto.pb2arrow.tests.v3.SimpleOneOfMessage";
+        let dynamic = to_dynamic(simple, msg_name)?;
+        let schema = SchemaRef::new(
+            schema_converter()?
+                .get_arrow_schema(msg_name, &[])?
+                .unwrap(),
+        );
+        //dbg!(schema.clone());
+        //dbg!(dynamic.descriptor().fields().collect::<Vec<_>>());
+
+        let mut converter = RecordBatchConverter::new(schema, 1);
+        converter.append_message(&dynamic)?;
+        let _records = converter.records();
+        //todo figure out how to assert on records;
         Ok(())
     }
 

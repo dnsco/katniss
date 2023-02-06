@@ -19,20 +19,30 @@ pub struct SchemaConverter {
 }
 
 /// Convert prost FieldDescriptor to arrow Field
-fn to_arrow(f: &FieldDescriptor) -> Result<Field> {
+fn to_arrow(f: &FieldDescriptor) -> Field {
     let name = f.name();
-    let data_type = kind_to_type(f.kind())?;
+    let data_type = kind_to_type(f.kind());
+    // OneOf fields are laid out weird. Each of the oneof's appear at the top level of the
+    // message, and there's a separate oneof container that associates the oneof fields together
+    // this means we can just sort of ignore the association during schema conversion for now
+    // and pretend it's just separate arrow fields.
+    //
+    // If we're concerned about storage size (and it sounds like it won't be the case for now)
+    // we can map OneOf's to an Arrow UnionType. This essentially makes the child arrays densely
+    // packed to save space and relies on a separate offset array to restore at read-time.
+    // However I think higher level query engines tend to not deal well with UnionTypes so
+    // we should just keep the "striped" layout for now
     if f.is_list() {
         let item = Box::new(Field::new("item", data_type, true));
-        Ok(Field::new(name, DataType::List(item), true))
+        Field::new(name, DataType::List(item), true)
     } else {
-        Ok(Field::new(name, data_type, true))
+        Field::new(name, data_type, true)
     }
 }
 
 /// Convert protobuf data type to arrow data type
-fn kind_to_type(kind: prost_reflect::Kind) -> Result<DataType> {
-    Ok(match kind {
+fn kind_to_type(kind: prost_reflect::Kind) -> DataType {
+    match kind {
         prost_reflect::Kind::Double => DataType::Float64,
         prost_reflect::Kind::Float => DataType::Float32,
         prost_reflect::Kind::Int32 => DataType::Int32,
@@ -49,14 +59,14 @@ fn kind_to_type(kind: prost_reflect::Kind) -> Result<DataType> {
         prost_reflect::Kind::String => DataType::Utf8,
         prost_reflect::Kind::Bytes => DataType::Binary,
         prost_reflect::Kind::Message(msg) => {
-            DataType::Struct(msg.fields().map(|f| to_arrow(&f)).collect::<Result<_>>()?)
+            DataType::Struct(msg.fields().map(|f| to_arrow(&f)).collect())
         }
         prost_reflect::Kind::Enum(_) => {
             let key_type = Box::new(DataType::Int32);
             let value_type = Box::new(DataType::Utf8);
             DataType::Dictionary(key_type, value_type)
         }
-    })
+    }
 }
 
 impl SchemaConverter {
@@ -104,11 +114,7 @@ impl SchemaConverter {
             Some(m) => m,
             None => return Ok(None),
         };
-        let schema = Schema::new(
-            msg.fields()
-                .map(|f| to_arrow(&f))
-                .collect::<Result<Vec<_>>>()?,
-        );
+        let schema = Schema::new(msg.fields().map(|f| to_arrow(&f)).collect());
 
         if projection.is_empty() {
             Ok(Some(schema))
