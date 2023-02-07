@@ -29,8 +29,9 @@ fn descriptor_pool() -> Result<DescriptorPool> {
 }
 
 #[cfg(test)]
-mod test {
+mod test_util {
     use std::{
+        any::type_name,
         fs::File,
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
@@ -40,8 +41,108 @@ mod test {
     use arrow_schema::SchemaRef;
     use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
     use prost::Message;
-    use prost_arrow::{RecordBatch, RecordBatchConverter};
+    use prost_arrow::RecordBatch;
     use prost_reflect::{DynamicMessage, MessageDescriptor};
+
+    use super::*;
+
+    pub enum ProtoBatch<'a, T: Message> {
+        #[allow(unused)]
+        V2(&'a [T]),
+        V3(&'a [T]),
+        SpaceCorp(&'a [T]),
+    }
+
+    impl<'a, T: Message> ProtoBatch<'a, T> {
+        pub fn arrow_batch(self) -> anyhow::Result<RecordBatch> {
+            let messages = self.messages();
+            let msg_name = &self.msg_name();
+
+            let mut converter = schema_converter()?.converter_for(msg_name, messages.len())?;
+            for m in messages {
+                converter.append_message(&to_dynamic(m, msg_name)?)?;
+            }
+
+            Ok(converter.records()?)
+        }
+
+        fn msg_name(&self) -> String {
+            let package_name = match self {
+                Self::V2(_) => "eto.pb2arrow.tests.v2",
+                Self::V3(_) => "eto.pb2arrow.tests.v3",
+                Self::SpaceCorp(_) => "eto.pb2arrow.tests.spacecorp",
+            };
+
+            let message_name = type_name_of_val(&self.messages()[0])
+                .split("::")
+                .last()
+                .unwrap();
+
+            format!("{package_name}.{message_name}")
+        }
+
+        fn messages(&self) -> &'a [T] {
+            let (ProtoBatch::V2(messages)
+            | ProtoBatch::V3(messages)
+            | ProtoBatch::SpaceCorp(messages)) = self;
+
+            messages
+        }
+    }
+
+    pub fn write_batch(batch: RecordBatch, test_name: &str) -> Result<(), anyhow::Error> {
+        let file = timestamped_data_file(test_name)?;
+        let props = WriterProperties::builder().build();
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))?;
+        writer.write(&batch)?;
+        writer.close()?;
+        Ok(())
+    }
+
+    pub fn timestamped_data_file(test_name: &str) -> Result<File, anyhow::Error> {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("data");
+        path.push(format!("{test_name}_{now}"));
+        path.set_extension("parquet");
+        let file = File::create(path)?;
+        Ok(file)
+    }
+
+    pub fn to_dynamic<P: Message>(proto: &P, message_name: &str) -> Result<DynamicMessage> {
+        let bytes: &[u8] = &proto.encode_to_vec();
+        let desc = schema_converter()?.get_message_by_name(message_name)?;
+        let message = DynamicMessage::decode(desc, bytes)?;
+        Ok(message)
+    }
+
+    pub fn first_schema_with(short_name: &str) -> Result<(SchemaRef, MessageDescriptor)> {
+        let schemas = schema_converter()?;
+
+        let arrow_schema = schemas
+            .get_arrow_schemas_by_short_name(short_name, &[])?
+            .remove(0)
+            .context("No schema found")?;
+
+        let proto_schema = schemas
+            .get_messages_from_short_name(short_name)
+            .remove(0)
+            .context("no message")?;
+
+        Ok((SchemaRef::new(arrow_schema), proto_schema))
+    }
+
+    fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
+        type_name::<T>()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use anyhow::Result;
+    use prost::Message;
+    use prost_arrow::RecordBatchConverter;
+    use prost_reflect::DynamicMessage;
 
     use super::*;
     use crate::protos::{
@@ -51,18 +152,17 @@ mod test {
             SimpleOneOfMessage, SomeRandomEnum, UnitContainer,
         },
     };
+    use test_util::*;
 
     #[test]
     fn test_unit_message() -> Result<()> {
-        let batch = batch_for(
-            "eto.pb2arrow.tests.v3.SimpleOneOfMessage",
-            &[
-                UnitContainer {
-                    inner: Some(InnerUnitMessage {}),
-                },
-                UnitContainer::default(),
-            ],
-        )?;
+        let batch = ProtoBatch::V3(&[
+            UnitContainer {
+                inner: Some(InnerUnitMessage {}),
+            },
+            UnitContainer::default(),
+        ])
+        .arrow_batch()?;
         write_batch(batch, "inner_unit")?;
         Ok(())
     }
@@ -100,7 +200,7 @@ mod test {
             })),
         };
 
-        let batch = batch_for("eto.pb2arrow.tests.v3.SimpleOneOfMessage", &[simple])?;
+        let batch = ProtoBatch::V3(&[simple]).arrow_batch()?;
         write_batch(batch, "simple_one_of")?;
         Ok(())
     }
@@ -112,16 +212,14 @@ mod test {
             ..Default::default()
         };
 
-        dbg!(&packet);
-
-        let batch = batch_for("eto.pb2arrow.tests.spacecorp.Packet", &[packet])?;
+        let batch = ProtoBatch::SpaceCorp(&[packet]).arrow_batch()?;
         write_batch(batch, "nested_null_struct")?;
         Ok(())
     }
 
     #[test]
     fn test_heterogenous_batch() -> Result<()> {
-        let packets = [
+        let batch = ProtoBatch::SpaceCorp(&[
             Packet {
                 msg: Some(packet::Msg::ClimateStatus(ClimateStatus::default())),
                 ..Default::default()
@@ -130,46 +228,10 @@ mod test {
                 msg: Some(packet::Msg::JumpDriveStatus(JumpDriveStatus::default())),
                 ..Default::default()
             },
-        ];
-
-        let batch = batch_for("eto.pb2arrow.tests.spacecorp.Packet", &packets)?;
+        ])
+        .arrow_batch()?;
         write_batch(batch, "heterogenous_batch")?;
         Ok(())
-    }
-
-    fn batch_for<P: Message>(msg_name: &str, messages: &[P]) -> Result<RecordBatch, anyhow::Error> {
-        let mut converter = schema_converter()?.converter_for(msg_name, messages.len())?;
-        for m in messages {
-            converter.append_message(&to_dynamic(m, msg_name)?)?;
-        }
-
-        Ok(converter.records()?)
-    }
-
-    fn write_batch(batch: RecordBatch, test_name: &str) -> Result<(), anyhow::Error> {
-        let file = timestamped_data_file(test_name)?;
-        let props = WriterProperties::builder().build();
-        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))?;
-        writer.write(&batch)?;
-        writer.close()?;
-        Ok(())
-    }
-
-    fn timestamped_data_file(test_name: &str) -> Result<File, anyhow::Error> {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("data");
-        path.push(format!("{test_name}_{now}"));
-        path.set_extension("parquet");
-        let file = File::create(path)?;
-        Ok(file)
-    }
-
-    fn to_dynamic<P: Message>(proto: &P, message_name: &str) -> Result<DynamicMessage> {
-        let bytes: &[u8] = &proto.encode_to_vec();
-        let desc = schema_converter()?.get_message_by_name(message_name)?;
-        let message = DynamicMessage::decode(desc, bytes)?;
-        Ok(message)
     }
 
     #[test]
@@ -196,21 +258,5 @@ mod test {
         // );
 
         Ok(())
-    }
-
-    fn first_schema_with(short_name: &str) -> Result<(SchemaRef, MessageDescriptor)> {
-        let schemas = schema_converter()?;
-
-        let arrow_schema = schemas
-            .get_arrow_schemas_by_short_name(short_name, &[])?
-            .remove(0)
-            .context("No schema found")?;
-
-        let proto_schema = schemas
-            .get_messages_from_short_name(short_name)
-            .remove(0)
-            .context("no message")?;
-
-        Ok((SchemaRef::new(arrow_schema), proto_schema))
     }
 }
