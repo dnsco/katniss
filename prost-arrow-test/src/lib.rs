@@ -118,7 +118,7 @@ mod test {
         ];
 
         let batch = batch_for("eto.pb2arrow.tests.spacecorp.Packet", &packets)?;
-        write_batch(batch, "nested_null_struct")?;
+        write_batch(batch, "heterogenous_batch")?;
         Ok(())
     }
 

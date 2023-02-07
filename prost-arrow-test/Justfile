@@ -1,0 +1,11 @@
+default:
+    just -l
+
+clean:
+    rm data/*.parquet
+
+clean_test: clean && print_test_parquets
+    cargo test
+
+print_test_parquets:
+    fd . data/ -x duckdb -s "select '{}' as file; select * from '{}'"
