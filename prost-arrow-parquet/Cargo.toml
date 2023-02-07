@@ -1,18 +1,11 @@
 [package]
-name = "prost-arrow-test"
+name = "prost-arrow-parquet"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.69"
-arrow-schema = "32.0.0"
 parquet = "32.0.0"
-prost = "0.11.6"
 prost-arrow = { path = "../prost-arrow" }
-prost-arrow-parquet = { path = "../prost-arrow-parquet" }
-prost-reflect = "0.10.1"
-
-[build-dependencies]
-prost-build = "0.11.6"
+thiserror = "1.0.38"

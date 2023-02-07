@@ -38,9 +38,9 @@ mod test_util {
     };
 
     use anyhow::Result;
-    use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
     use prost::Message;
     use prost_arrow::RecordBatch;
+    use prost_arrow_parquet::write_batch_inner;
     use prost_reflect::DynamicMessage;
 
     use super::*;
@@ -89,25 +89,6 @@ mod test_util {
         }
     }
 
-    pub fn write_batch(batch: RecordBatch, test_name: &str) -> Result<(), anyhow::Error> {
-        let file = timestamped_data_file(test_name)?;
-        let props = WriterProperties::builder().build();
-        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))?;
-        writer.write(&batch)?;
-        writer.close()?;
-        Ok(())
-    }
-
-    pub fn timestamped_data_file(test_name: &str) -> Result<File, anyhow::Error> {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("data");
-        path.push(format!("{test_name}_{now}"));
-        path.set_extension("parquet");
-        let file = File::create(path)?;
-        Ok(file)
-    }
-
     pub fn to_dynamic<P: Message>(proto: &P, message_name: &str) -> Result<DynamicMessage> {
         let bytes: &[u8] = &proto.encode_to_vec();
         let desc = schema_converter()?.get_message_by_name(message_name)?;
@@ -117,6 +98,21 @@ mod test_util {
 
     fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
         type_name::<T>()
+    }
+
+    pub fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
+        let file = timestamped_data_file(test_name)?;
+        Ok(write_batch_inner(batch, file)?)
+    }
+
+    pub fn timestamped_data_file(test_name: &str) -> Result<File> {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("data");
+        path.push(format!("{test_name}_{now}"));
+        path.set_extension("parquet");
+        let file = File::create(path)?;
+        Ok(file)
     }
 }
 

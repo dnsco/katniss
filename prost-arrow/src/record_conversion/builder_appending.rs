@@ -281,7 +281,6 @@ fn parse_val<'val, 'ret: 'val, R, F>(value: Option<&'val Value>, getter: F) -> R
 where
     F: Fn(&'val Value) -> Option<R> + 'ret,
 {
-    dbg!(value);
     value
         .map(|v| getter(v).ok_or_else(|| ProstArrowError::TypeCastError(v.clone())))
         .transpose()
