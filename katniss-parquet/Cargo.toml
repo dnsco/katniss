@@ -9,3 +9,4 @@ edition = "2021"
 parquet = "32.0.0"
 katniss-pb2arrow = { path = "../katniss-pb2arrow" }
 thiserror = "1.0.38"
+arrow-schema = "32.0.0"

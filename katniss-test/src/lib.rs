@@ -38,10 +38,10 @@ mod test_util {
     };
 
     use anyhow::Result;
+    use katniss_parquet::Writer;
     use prost::Message;
     use prost_reflect::DynamicMessage;
 
-    use katniss_parquet::write_batch_inner;
     use katniss_pb2arrow::RecordBatch;
 
     use super::*;
@@ -102,8 +102,10 @@ mod test_util {
     }
 
     pub fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
-        let file = timestamped_data_file(test_name)?;
-        Ok(write_batch_inner(batch, file)?)
+        let mut writer = Writer::new(timestamped_data_file(test_name)?, batch.schema())?;
+        writer.write_batch(&batch)?;
+        writer.finish()?;
+        Ok(())
     }
 
     pub fn timestamped_data_file(test_name: &str) -> Result<File> {
