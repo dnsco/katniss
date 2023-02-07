@@ -12,6 +12,10 @@ use katniss_pb2arrow::RecordBatch;
 pub mod errors;
 use self::errors::Result;
 
+/// The desire is to make a struct that holds stuff in memory until it dumps to a file
+/// right now it is actually just writing to files because YOLO
+/// Eventually this should hold arrow stuff in memory and be queryable and then dump at some interval
+/// because it's easier we're just gonna dump after a set number
 pub struct MultiBatchWriter {
     num_batches: usize,
     batches: Vec<RecordBatch>,
@@ -46,7 +50,7 @@ impl MultiBatchWriter {
     }
 
     /// Finalize current parquet file, start new file and freshen in memory buffer
-    pub fn finalize_and_advance(&mut self) -> Result<()> {
+    fn finalize_and_advance(&mut self) -> Result<()> {
         let writer = std::mem::replace(&mut self.writer, self.factory.new_writer()?);
         self.batches = Vec::with_capacity(self.num_batches);
         writer.close()?;

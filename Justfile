@@ -1,4 +1,4 @@
-#list just tasks
+# list just tasks
 default:
     just -l
 

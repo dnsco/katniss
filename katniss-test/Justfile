@@ -1,10 +1,10 @@
-#list just tasks
+# list just tasks
 default:
     just -l
 
 # Delete old data files from test
 clean:
-    rm data/*.parquet
+    rm -r data/tests
 
 # clean data, run this crate's tests and dump to stdout
 clean_test: clean && print_test_parquets

@@ -105,7 +105,6 @@ mod test_util {
 
         let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
         writer.write_batch(batch)?;
-        writer.finalize_and_advance()?;
         Ok(())
     }
 }
