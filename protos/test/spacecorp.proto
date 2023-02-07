@@ -19,7 +19,6 @@ message Packet {
     }
 }
 
-
 // This is copypasta'ed from google well known types Timestamp,
 // it would be good to:
 // support well known types converstion to appropriate datetime time

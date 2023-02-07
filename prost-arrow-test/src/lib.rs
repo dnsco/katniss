@@ -37,12 +37,11 @@ mod test_util {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use anyhow::{Context, Result};
-    use arrow_schema::SchemaRef;
+    use anyhow::Result;
     use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
     use prost::Message;
     use prost_arrow::RecordBatch;
-    use prost_reflect::{DynamicMessage, MessageDescriptor};
+    use prost_reflect::DynamicMessage;
 
     use super::*;
 
@@ -116,22 +115,6 @@ mod test_util {
         Ok(message)
     }
 
-    pub fn first_schema_with(short_name: &str) -> Result<(SchemaRef, MessageDescriptor)> {
-        let schemas = schema_converter()?;
-
-        let arrow_schema = schemas
-            .get_arrow_schemas_by_short_name(short_name, &[])?
-            .remove(0)
-            .context("No schema found")?;
-
-        let proto_schema = schemas
-            .get_messages_from_short_name(short_name)
-            .remove(0)
-            .context("no message")?;
-
-        Ok((SchemaRef::new(arrow_schema), proto_schema))
-    }
-
     fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
         type_name::<T>()
     }
@@ -140,9 +123,6 @@ mod test_util {
 #[cfg(test)]
 mod test {
     use anyhow::Result;
-    use prost::Message;
-    use prost_arrow::RecordBatchConverter;
-    use prost_reflect::DynamicMessage;
 
     use super::*;
     use crate::protos::{
@@ -155,12 +135,12 @@ mod test {
     use test_util::*;
 
     #[test]
-    fn test_unit_message() -> Result<()> {
+    fn test_nested_unit_message() -> Result<()> {
         let batch = ProtoBatch::V3(&[
             UnitContainer {
                 inner: Some(InnerUnitMessage {}),
             },
-            UnitContainer::default(),
+            UnitContainer { inner: None },
         ])
         .arrow_batch()?;
         write_batch(batch, "inner_unit")?;
@@ -169,22 +149,12 @@ mod test {
 
     #[test]
     fn test_enums() -> Result<()> {
-        let (arrow_schema, proto_schema) = first_schema_with("MessageWithNestedEnum")?;
-
-        let mut converter = RecordBatchConverter::new(arrow_schema, 1);
-
-        let message = MessageWithNestedEnum {
+        let enum_message = MessageWithNestedEnum {
             status: SomeRandomEnum::Failing.into(),
         };
 
-        converter.append_message(&DynamicMessage::decode(
-            proto_schema.clone(),
-            &message.encode_to_vec() as &[u8],
-        )?)?;
-
-        let batch = converter.records()?;
-        dbg!(batch);
-
+        let batch = ProtoBatch::V3(&[enum_message]).arrow_batch()?;
+        write_batch(batch, "enums")?;
         Ok(())
     }
 
@@ -246,7 +216,7 @@ mod test {
         assert_eq!(2, arrow.len());
         assert!(arrow.iter().all(|a| a.is_some()));
 
-        // TODO: filtering by projectin is weird
+        // TODO: filtering by projection is weird
         // let projected_arrow = converter.get_arrow_schemas_by_short_name("Bar", &["v3_only"])?;
         // assert_eq!(2, projected_arrow.len());
         // assert_eq!(
