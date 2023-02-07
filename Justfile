@@ -8,6 +8,6 @@ install_cli_deps:
 
 # Clean out data dir, run all crates test suites and dump test parquests to stdout
 test:
-    just prost-arrow-test/clean
+    just katniss-test/clean
     cargo test
-    just prost-arrow-test/print_test_parquets
+    just katniss-test/print_test_parquets

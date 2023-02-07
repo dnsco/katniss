@@ -30,15 +30,10 @@ fn descriptor_pool() -> Result<DescriptorPool> {
 
 #[cfg(test)]
 mod test_util {
-    use std::{
-        any::type_name,
-        fs::File,
-        path::PathBuf,
-        time::{SystemTime, UNIX_EPOCH},
-    };
+    use std::{any::type_name, path::PathBuf};
 
     use anyhow::Result;
-    use katniss_parquet::Writer;
+    use katniss_parquet::MultiBatchWriter;
     use prost::Message;
     use prost_reflect::DynamicMessage;
 
@@ -102,20 +97,16 @@ mod test_util {
     }
 
     pub fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
-        let mut writer = Writer::new(timestamped_data_file(test_name)?, batch.schema())?;
-        writer.write_batch(&batch)?;
-        writer.finish()?;
-        Ok(())
-    }
-
-    pub fn timestamped_data_file(test_name: &str) -> Result<File> {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("data");
-        path.push(format!("{test_name}_{now}"));
-        path.set_extension("parquet");
-        let file = File::create(path)?;
-        Ok(file)
+        path.push("tests");
+        path.push(test_name);
+        std::fs::create_dir_all(&path)?;
+
+        let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
+        writer.write_batch(batch)?;
+        writer.finalize_and_advance()?;
+        Ok(())
     }
 }
 
