@@ -148,6 +148,13 @@ mod test {
     }
 
     #[test]
+    fn test_base_unit_messages() -> Result<()> {
+        let batch = ProtoBatch::V3(&[InnerUnitMessage {}]).arrow_batch()?;
+        write_batch(batch, "inner_unit")?;
+        Ok(())
+    }
+
+    #[test]
     fn test_enums() -> Result<()> {
         let enum_message = MessageWithNestedEnum {
             status: SomeRandomEnum::Failing.into(),

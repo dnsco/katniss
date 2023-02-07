@@ -7,7 +7,7 @@ pub enum ProstArrowError {
     #[error("file descriptor not found {0}")]
     DescriptorNotFound(String),
 
-    #[error("couldn't cast value {0} to correct type")]
+    #[error("couldn't cast value {0:?} to correct type")]
     TypeCastError(Value),
 
     #[error("Field is not an enum")]

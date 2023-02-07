@@ -59,7 +59,12 @@ fn kind_to_type(kind: prost_reflect::Kind) -> DataType {
         prost_reflect::Kind::String => DataType::Utf8,
         prost_reflect::Kind::Bytes => DataType::Binary,
         prost_reflect::Kind::Message(msg) => {
-            DataType::Struct(msg.fields().map(|f| to_arrow(&f)).collect())
+            let fields = msg.fields();
+            if fields.len() > 0 {
+                DataType::Struct(msg.fields().map(|f| to_arrow(&f)).collect())
+            } else {
+                DataType::Boolean
+            }
         }
         prost_reflect::Kind::Enum(_) => {
             let key_type = Box::new(DataType::Int32);

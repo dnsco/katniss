@@ -104,7 +104,12 @@ fn append_non_list_value(
         ),
         DataType::Boolean => extend_builder(
             field_builder::<BooleanBuilder>(struct_builder, i),
-            parse_val(val, Value::as_bool)?,
+            if let Some(Value::Message(_)) = val {
+                //unit variant structs
+                Some(true)
+            } else {
+                parse_val(val, Value::as_bool)?
+            },
         ),
         DataType::Dictionary(_, _) => {
             let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
@@ -276,6 +281,7 @@ fn parse_val<'val, 'ret: 'val, R, F>(value: Option<&'val Value>, getter: F) -> R
 where
     F: Fn(&'val Value) -> Option<R> + 'ret,
 {
+    dbg!(value);
     value
         .map(|v| getter(v).ok_or_else(|| ProstArrowError::TypeCastError(v.clone())))
         .transpose()
