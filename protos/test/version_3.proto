@@ -38,3 +38,9 @@ message SimpleOneOfMessage {
 		Bar bar = 3;
 	}
 }
+
+message UnitContainer {
+	InnerUnitMessage inner = 1;
+}
+
+message InnerUnitMessage {}

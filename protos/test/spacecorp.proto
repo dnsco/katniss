@@ -15,8 +15,10 @@ message Packet {
         JumpDriveStatus jump_drive_status = 101;
         ClimateControl climate_control = 102;
         ClimateStatus climate_status = 103;
+        NewComponentControl unit_message = 104;
     }
 }
+
 
 // This is copypasta'ed from google well known types Timestamp,
 // it would be good to:
@@ -167,3 +169,8 @@ message PidControl {
     // controller wants and the plant can give based on the limits
     float error_saturation = 19;
   }
+
+
+// New components will be sketeched out by making empty messsages definitions for them
+// Since in protobuf adding a field isn't considered destructive you're encouraged to plumb out future needs
+message NewComponentControl {} // Plesase keep Empty to test nested unit variant issues

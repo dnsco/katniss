@@ -47,10 +47,25 @@ mod test {
     use crate::protos::{
         spacecorp::{packet, ClimateStatus, JumpDriveStatus, Packet},
         v3::{
-            simple_one_of_message::Inner, Foo, MessageWithNestedEnum, SimpleOneOfMessage,
-            SomeRandomEnum,
+            simple_one_of_message::Inner, Foo, InnerUnitMessage, MessageWithNestedEnum,
+            SimpleOneOfMessage, SomeRandomEnum, UnitContainer,
         },
     };
+
+    #[test]
+    fn test_unit_message() -> Result<()> {
+        let batch = batch_for(
+            "eto.pb2arrow.tests.v3.SimpleOneOfMessage",
+            &[
+                UnitContainer {
+                    inner: Some(InnerUnitMessage {}),
+                },
+                UnitContainer::default(),
+            ],
+        )?;
+        write_batch(batch, "inner_unit")?;
+        Ok(())
+    }
 
     #[test]
     fn test_enums() -> Result<()> {
