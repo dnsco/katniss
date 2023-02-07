@@ -1,11 +1,15 @@
+#list just tasks
 default:
     just -l
 
+# Delete old data files from test
 clean:
     rm data/*.parquet
 
+# clean data, run this crate's tests and dump to stdout
 clean_test: clean && print_test_parquets
     cargo test
 
+# dumps contents of all parquets to stdout
 print_test_parquets:
     fd . data/ -x duckdb -s "select '{}' as file; select * from '{}'"
