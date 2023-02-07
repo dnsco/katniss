@@ -1,4 +1,4 @@
 
 [workspace]
 
-members = ["prost-arrow", "prost-arrow-parquet", "prost-arrow-test"]
+members = ["katniss-parquet", "katniss-pb2arrow", "katniss-test"]

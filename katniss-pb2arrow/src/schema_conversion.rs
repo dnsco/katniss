@@ -81,7 +81,7 @@ impl SchemaConverter {
     /// Compile protobuf files and build the converter.
     ///
     /// ```rust
-    ///   use prost_arrow::SchemaConverter;
+    ///   use katniss_pb2arrow::SchemaConverter;
     ///
     ///   let convert = SchemaConverter::compile(
     ///       &["protos/foo.proto"], &["protos"]

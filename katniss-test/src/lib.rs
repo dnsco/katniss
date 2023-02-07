@@ -1,5 +1,5 @@
 use anyhow::Result;
-use prost_arrow::SchemaConverter;
+use katniss_pb2arrow::SchemaConverter;
 use prost_reflect::DescriptorPool;
 
 pub mod protos {
@@ -39,9 +39,10 @@ mod test_util {
 
     use anyhow::Result;
     use prost::Message;
-    use prost_arrow::RecordBatch;
-    use prost_arrow_parquet::write_batch_inner;
     use prost_reflect::DynamicMessage;
+
+    use katniss_parquet::write_batch_inner;
+    use katniss_pb2arrow::RecordBatch;
 
     use super::*;
 
