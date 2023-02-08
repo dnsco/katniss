@@ -16,9 +16,8 @@ pub mod errors;
 use self::errors::Result;
 
 /// The desire is to make a struct that holds stuff in memory until it dumps to a file
-/// right now it is actually just writing to files because YOLO
-/// Eventually this should hold arrow stuff in memory and be queryable and then dump at some interval
-/// because it's easier we're just gonna dump after a set number
+/// Eventually this should hold arrow stuff in memory and be queryable and
+/// Buffers should arguably represnet a fixed time period but right now it is a fixed number of arrow batches
 pub struct MultiBatchWriter {
     num_batches: usize,
     batches: Vec<RecordBatch>,
@@ -47,17 +46,19 @@ impl MultiBatchWriter {
         })
     }
 
+    /// Write an arrow RecordBatch to a parquet buffer
+    /// Finalizes parquet buffer and advances if enough batches have been written
     pub fn write_batch(&mut self, batch: RecordBatch) -> Result<()> {
         self.writer.write(&batch)?;
         self.batches.push(batch);
         if self.batches.len() >= self.num_batches {
-            self.finalize_and_advance()?;
+            self.advance_buffer()?;
         }
         Ok(())
     }
 
-    /// Finalize current parquet file, start new file and freshen in memory buffer
-    fn finalize_and_advance(&mut self) -> Result<()> {
+    /// Write current buffer to file and start a new one for next time period
+    fn advance_buffer(&mut self) -> Result<()> {
         let writer = std::mem::replace(
             &mut self.writer,
             ParquetBuffer::new(&self.path, self.schema.clone(), self.props.clone())?,
