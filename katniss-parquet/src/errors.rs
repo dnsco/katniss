@@ -12,6 +12,9 @@ pub enum ProstArrowParquetError {
 
     #[error("Timelord Error: {0}")]
     TimeyWimeyStuff(#[from] SystemTimeError),
+
+    #[error("Failed to lock data")]
+    MemoryFileReferenceStillHeld,
 }
 
 pub type Result<T> = core::result::Result<T, ProstArrowParquetError>;

@@ -1,10 +1,13 @@
 use std::{
-    fs::File,
+    fs,
+    io::{self, ErrorKind, Write},
     path::PathBuf,
+    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use arrow_schema::SchemaRef;
+use errors::ProstArrowParquetError;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 
 use katniss_pb2arrow::RecordBatch;
@@ -20,22 +23,26 @@ pub struct MultiBatchWriter {
     num_batches: usize,
     batches: Vec<RecordBatch>,
 
-    factory: WriterFactory,
-    writer: ArrowWriter<File>,
+    path: PathBuf,
+    props: WriterProperties,
+    schema: SchemaRef,
+    writer: ParquetBuffer,
 }
 
 impl MultiBatchWriter {
     pub fn new(path: PathBuf, schema: SchemaRef, num_batches: usize) -> Result<Self> {
         let batches = Vec::with_capacity(num_batches);
 
-        let factory = WriterFactory::new(path, WriterProperties::builder().build(), schema);
-        let writer = factory.new_writer()?;
+        let props = WriterProperties::builder().build();
+        let writer = ParquetBuffer::new(&path, schema.clone(), props.clone())?;
 
         Ok(Self {
             num_batches,
             batches,
 
-            factory,
+            path,
+            schema,
+            props,
             writer,
         })
     }
@@ -51,47 +58,85 @@ impl MultiBatchWriter {
 
     /// Finalize current parquet file, start new file and freshen in memory buffer
     fn finalize_and_advance(&mut self) -> Result<()> {
-        let writer = std::mem::replace(&mut self.writer, self.factory.new_writer()?);
+        let writer = std::mem::replace(
+            &mut self.writer,
+            ParquetBuffer::new(&self.path, self.schema.clone(), self.props.clone())?,
+        );
         self.batches = Vec::with_capacity(self.num_batches);
-        writer.close()?;
+        writer.finish()?;
         Ok(())
     }
 }
 
-struct WriterFactory {
-    path: PathBuf,
-    props: WriterProperties,
-    schema: SchemaRef,
+struct ParquetBuffer {
+    file: MemoryFile,
+    writer: ArrowWriter<MemoryFile>,
 }
 
-impl WriterFactory {
-    pub fn new(path: PathBuf, props: WriterProperties, schema: SchemaRef) -> Self {
-        Self {
-            path,
-            props,
-            schema,
-        }
+impl ParquetBuffer {
+    pub fn new(path: &PathBuf, schema: SchemaRef, props: WriterProperties) -> Result<Self> {
+        let file = MemoryFile {
+            filename: timestamped_filename(path)?,
+            data: Arc::new(Mutex::new(Vec::new())),
+        };
+        let writer = ArrowWriter::try_new(file.clone(), schema, Some(props))?;
+
+        Ok(Self { file, writer })
     }
 
-    pub fn file_in_path(&self) -> Result<File> {
-        let mut filename = self.path.clone();
-        filename.push(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)?
-                .as_millis()
-                .to_string(),
-        );
-        filename.set_extension("parquet");
-        let file = File::create(filename)?;
-        Ok(file)
+    fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+        self.writer.write(batch)?;
+        Ok(())
     }
 
-    pub fn new_writer(&self) -> Result<ArrowWriter<File>> {
-        let writer = ArrowWriter::try_new(
-            self.file_in_path()?,
-            self.schema.clone(),
-            Some(self.props.clone()),
-        )?;
-        Ok(writer)
+    fn finish(self) -> Result<(PathBuf, Vec<u8>)> {
+        self.writer.close()?;
+        self.file.copy_to_file()
+    }
+}
+
+fn timestamped_filename(path: &PathBuf) -> Result<PathBuf> {
+    let mut filename = path.clone();
+    filename.push(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_millis()
+            .to_string(),
+    );
+    filename.set_extension("parquet");
+    Ok(filename)
+}
+
+#[derive(Clone)]
+struct MemoryFile {
+    filename: PathBuf,
+    data: Arc<Mutex<Vec<u8>>>,
+}
+
+impl MemoryFile {
+    fn copy_to_file(self) -> Result<(PathBuf, Vec<u8>)> {
+        let data = Arc::try_unwrap(self.data)
+            .map_err(|_| ProstArrowParquetError::MemoryFileReferenceStillHeld)?
+            .into_inner()
+            .map_err(|_| ProstArrowParquetError::MemoryFileReferenceStillHeld)?;
+        let filename = self.filename;
+
+        fs::write(&filename, &data[..])?;
+        Ok((filename, data))
+    }
+}
+
+impl Write for MemoryFile {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut data = self
+            .data
+            .lock()
+            .map_err(|err| io::Error::new(ErrorKind::WouldBlock, err.to_string()))?;
+        data.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
