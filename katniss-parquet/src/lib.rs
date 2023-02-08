@@ -63,42 +63,52 @@ impl MultiBatchWriter {
             ParquetBuffer::new(&self.path, self.schema.clone(), self.props.clone())?,
         );
         self.batches = Vec::with_capacity(self.num_batches);
-        writer.finish()?;
+        writer.finalize_and_write_file()?;
         Ok(())
     }
 }
 
 struct ParquetBuffer {
-    file: MemoryFile,
-    writer: ArrowWriter<MemoryFile>,
+    filename: PathBuf,
+    parquet_writer: ArrowWriter<SharedBuffer>,
+    buffer: SharedBuffer,
 }
 
 impl ParquetBuffer {
     pub fn new(path: &PathBuf, schema: SchemaRef, props: WriterProperties) -> Result<Self> {
-        let file = MemoryFile {
-            filename: timestamped_filename(path)?,
+        let filename = timestamp_filename(&path, SystemTime::now())?;
+
+        let buffer = SharedBuffer {
             data: Arc::new(Mutex::new(Vec::new())),
         };
-        let writer = ArrowWriter::try_new(file.clone(), schema, Some(props))?;
 
-        Ok(Self { file, writer })
+        let writer = ArrowWriter::try_new(buffer.clone(), schema, Some(props))?;
+
+        Ok(Self {
+            filename,
+            buffer,
+            parquet_writer: writer,
+        })
     }
 
     fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.writer.write(batch)?;
+        self.parquet_writer.write(batch)?;
         Ok(())
     }
 
-    fn finish(self) -> Result<(PathBuf, Vec<u8>)> {
-        self.writer.close()?;
-        self.file.copy_to_file()
+    fn finalize_and_write_file(self) -> Result<(PathBuf, Vec<u8>)> {
+        self.parquet_writer.close()?;
+        let bytes = self.buffer.try_downgrade()?;
+
+        fs::write(&self.filename, &bytes)?;
+        Ok((self.filename, bytes))
     }
 }
 
-fn timestamped_filename(path: &PathBuf) -> Result<PathBuf> {
-    let mut filename = path.clone();
+fn timestamp_filename(path: &PathBuf, start_time: SystemTime) -> Result<PathBuf> {
+    let mut filename = path.to_owned();
     filename.push(
-        SystemTime::now()
+        start_time
             .duration_since(UNIX_EPOCH)?
             .as_millis()
             .to_string(),
@@ -108,25 +118,22 @@ fn timestamped_filename(path: &PathBuf) -> Result<PathBuf> {
 }
 
 #[derive(Clone)]
-struct MemoryFile {
-    filename: PathBuf,
+struct SharedBuffer {
     data: Arc<Mutex<Vec<u8>>>,
 }
 
-impl MemoryFile {
-    fn copy_to_file(self) -> Result<(PathBuf, Vec<u8>)> {
+impl SharedBuffer {
+    fn try_downgrade(self) -> Result<Vec<u8>> {
         let data = Arc::try_unwrap(self.data)
-            .map_err(|_| ProstArrowParquetError::MemoryFileReferenceStillHeld)?
+            .map_err(|_| ProstArrowParquetError::OtherSharedBufferReferenceHeld)?
             .into_inner()
-            .map_err(|_| ProstArrowParquetError::MemoryFileReferenceStillHeld)?;
-        let filename = self.filename;
+            .map_err(|_| ProstArrowParquetError::OtherSharedBufferReferenceHeld)?;
 
-        fs::write(&filename, &data[..])?;
-        Ok((filename, data))
+        Ok(data)
     }
 }
 
-impl Write for MemoryFile {
+impl Write for SharedBuffer {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let mut data = self
             .data

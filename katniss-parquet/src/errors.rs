@@ -14,7 +14,7 @@ pub enum ProstArrowParquetError {
     TimeyWimeyStuff(#[from] SystemTimeError),
 
     #[error("Failed to lock data")]
-    MemoryFileReferenceStillHeld,
+    OtherSharedBufferReferenceHeld,
 }
 
 pub type Result<T> = core::result::Result<T, ProstArrowParquetError>;
