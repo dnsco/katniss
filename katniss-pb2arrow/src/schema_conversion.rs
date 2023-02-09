@@ -10,7 +10,7 @@ use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
 
-use crate::{ProstArrowError, RecordBatchConverter, Result};
+use crate::{KatnissArrowError, RecordBatchConverter, Result};
 
 /// Dynamically convert protobuf messages to Arrow table or Schema.
 #[derive(Debug, Clone)]
@@ -90,7 +90,7 @@ impl SchemaConverter {
     pub fn compile(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]) -> Result<Self> {
         let protoc = match which::which("protoc") {
             Ok(path) => path,
-            Err(e) => return Err(ProstArrowError::ProtocError(e)),
+            Err(e) => return Err(KatnissArrowError::ProtocError(e)),
         };
 
         let mut file_descriptor_file = NamedTempFile::new()?;
@@ -140,7 +140,7 @@ impl SchemaConverter {
     pub fn get_message_by_name(&self, name: &str) -> Result<MessageDescriptor> {
         self.descriptor_pool
             .get_message_by_name(name)
-            .ok_or_else(|| ProstArrowError::DescriptorNotFound(name.to_owned()))
+            .ok_or_else(|| KatnissArrowError::DescriptorNotFound(name.to_owned()))
     }
 
     pub fn get_arrow_schemas_by_short_name(

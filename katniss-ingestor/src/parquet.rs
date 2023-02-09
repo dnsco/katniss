@@ -1,19 +1,15 @@
 use std::{
     fs,
-    io::{self, ErrorKind, Write},
     path::PathBuf,
-    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use arrow_schema::SchemaRef;
-use errors::ProstArrowParquetError;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 
-use katniss_pb2arrow::RecordBatch;
-
-pub mod errors;
-use self::errors::Result;
+use crate::buffer::SharedBuffer;
+use crate::Result;
+use katniss_pb2arrow::exports::RecordBatch;
 
 /// The desire is to make a struct that holds stuff in memory until it dumps to a file
 /// Eventually this should hold arrow stuff in memory and be queryable and
@@ -79,9 +75,7 @@ impl ParquetBuffer {
     pub fn new(path: &PathBuf, schema: SchemaRef, props: WriterProperties) -> Result<Self> {
         let filename = timestamp_filename(&path, SystemTime::now())?;
 
-        let buffer = SharedBuffer {
-            data: Arc::new(Mutex::new(Vec::new())),
-        };
+        let buffer = SharedBuffer::new();
 
         let writer = ArrowWriter::try_new(buffer.clone(), schema, Some(props))?;
 
@@ -116,35 +110,4 @@ fn timestamp_filename(path: &PathBuf, start_time: SystemTime) -> Result<PathBuf>
     );
     filename.set_extension("parquet");
     Ok(filename)
-}
-
-#[derive(Clone)]
-struct SharedBuffer {
-    data: Arc<Mutex<Vec<u8>>>,
-}
-
-impl SharedBuffer {
-    fn try_downgrade(self) -> Result<Vec<u8>> {
-        let data = Arc::try_unwrap(self.data)
-            .map_err(|_| ProstArrowParquetError::OtherSharedBufferReferenceHeld)?
-            .into_inner()
-            .map_err(|_| ProstArrowParquetError::OtherSharedBufferReferenceHeld)?;
-
-        Ok(data)
-    }
-}
-
-impl Write for SharedBuffer {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut data = self
-            .data
-            .lock()
-            .map_err(|err| io::Error::new(ErrorKind::WouldBlock, err.to_string()))?;
-        data.extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }

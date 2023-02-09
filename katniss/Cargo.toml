@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 katniss-pb2arrow = { path = "../katniss-pb2arrow" }
-katniss-parquet = { path = "../katniss-parquet" }
+katniss-ingestor = { path = "../katniss-ingestor" }

@@ -6,11 +6,14 @@ mod errors;
 mod record_conversion;
 mod schema_conversion;
 
-pub use errors::{ProstArrowError, Result};
+pub use errors::{KatnissArrowError, Result};
 pub use record_conversion::RecordBatchConverter;
 pub use schema_conversion::SchemaConverter;
 
-pub use arrow_array::RecordBatch;
+pub mod exports {
+    pub use arrow_array::RecordBatch;
+    pub use prost_reflect::DynamicMessage;
+}
 
 #[cfg(test)]
 mod tests {

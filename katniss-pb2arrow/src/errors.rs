@@ -3,7 +3,7 @@ use prost_reflect::Value;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ProstArrowError {
+pub enum KatnissArrowError {
     #[error("file descriptor not found {0}")]
     DescriptorNotFound(String),
 
@@ -27,6 +27,9 @@ pub enum ProstArrowError {
 
     #[error("Io Errror")]
     IoError(#[from] std::io::Error),
+
+    #[error("Batch Conversion Error: {0}")]
+    BatchConversionError(ArrowError),
 }
 
-pub type Result<T> = core::result::Result<T, ProstArrowError>;
+pub type Result<T> = core::result::Result<T, KatnissArrowError>;

@@ -33,11 +33,11 @@ mod test_util {
     use std::{any::type_name, path::PathBuf};
 
     use anyhow::Result;
-    use katniss_parquet::MultiBatchWriter;
+    use katniss_ingestor::parquet::MultiBatchWriter;
     use prost::Message;
     use prost_reflect::DynamicMessage;
 
-    use katniss_pb2arrow::RecordBatch;
+    use katniss_pb2arrow::exports::RecordBatch;
 
     use super::*;
 

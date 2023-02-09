@@ -1,9 +1,13 @@
 use std::time::SystemTimeError;
 
+use katniss_pb2arrow::KatnissArrowError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ProstArrowParquetError {
+pub enum KatinssIngestorError {
+    #[error("Protobuf Conversion Error: {0}")]
+    Pb2ArrowArror(#[from] KatnissArrowError),
+
     #[error("Io Errror")]
     IoError(#[from] std::io::Error),
 
@@ -16,5 +20,3 @@ pub enum ProstArrowParquetError {
     #[error("Failed to lock data")]
     OtherSharedBufferReferenceHeld,
 }
-
-pub type Result<T> = core::result::Result<T, ProstArrowParquetError>;

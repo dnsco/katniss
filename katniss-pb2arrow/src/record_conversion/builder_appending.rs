@@ -3,7 +3,7 @@ use arrow_array::types::Int32Type;
 use arrow_schema::{DataType, Field};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 
-use crate::{ProstArrowError, Result};
+use crate::{KatnissArrowError, Result};
 
 pub fn append_all_fields(
     fields: &Vec<Field>,
@@ -42,7 +42,7 @@ fn append_non_list_value(
         .map(|msg| {
             msg.descriptor()
                 .get_field_by_name(f.name())
-                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))
+                .ok_or_else(|| KatnissArrowError::DescriptorNotFound(f.name().to_owned()))
         })
         .transpose()?;
 
@@ -120,13 +120,13 @@ fn append_non_list_value(
                     let kind = fd_option.unwrap().kind();
                     let enum_descriptor = kind
                         .as_enum()
-                        .ok_or_else(|| ProstArrowError::NonEnumField)?;
+                        .ok_or_else(|| KatnissArrowError::NonEnumField)?;
 
                     let enum_value = enum_descriptor
                         .get_value(intval)
-                        .ok_or_else(|| ProstArrowError::NoEnumValue(intval))?;
+                        .ok_or_else(|| KatnissArrowError::NoEnumValue(intval))?;
                     f.append(enum_value.name())
-                        .map_err(|err| ProstArrowError::InvalidEnumValue(err))?;
+                        .map_err(|err| KatnissArrowError::InvalidEnumValue(err))?;
                 }
                 None => f.append_null(),
             };
@@ -159,7 +159,7 @@ fn append_list_value(
         .map(|msg| {
             msg.descriptor()
                 .get_field_by_name(f.name())
-                .ok_or_else(|| ProstArrowError::DescriptorNotFound(f.name().to_owned()))
+                .ok_or_else(|| KatnissArrowError::DescriptorNotFound(f.name().to_owned()))
         })
         .transpose()?;
 
@@ -182,7 +182,7 @@ fn append_list_value(
     let values = if let Some(v) = v { v.as_list() } else { None };
 
     let (DataType::List(inner) | DataType::LargeList(inner)) = f.data_type() else {
-        return Err(ProstArrowError::NonListField)
+        return Err(KatnissArrowError::NonListField)
     };
 
     match inner.data_type() {
@@ -234,7 +234,7 @@ fn append_list_value(
             let kind = fd_option.unwrap().kind();
             let enum_descriptor = kind
                 .as_enum()
-                .ok_or_else(|| ProstArrowError::NonEnumField)?;
+                .ok_or_else(|| KatnissArrowError::NonEnumField)?;
             let f: &mut ListBuilder<StringDictionaryBuilder<Int32Type>> =
                 field_builder(struct_builder, i);
             let val_lst: Option<Vec<Option<String>>> = values.map(|vs| {
@@ -282,7 +282,7 @@ where
     F: Fn(&'val Value) -> Option<R> + 'ret,
 {
     value
-        .map(|v| getter(v).ok_or_else(|| ProstArrowError::TypeCastError(v.clone())))
+        .map(|v| getter(v).ok_or_else(|| KatnissArrowError::TypeCastError(v.clone())))
         .transpose()
 }
 
@@ -299,7 +299,7 @@ where
             vs.iter()
                 .map(|v| match getter(v) {
                     Some(v) => Ok(Some(v)),
-                    None => Err(ProstArrowError::TypeCastError(v.clone())),
+                    None => Err(KatnissArrowError::TypeCastError(v.clone())),
                 })
                 .collect::<Result<Vec<_>>>()
         })

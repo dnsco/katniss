@@ -3,6 +3,7 @@ use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, SchemaRef};
 use prost_reflect::DynamicMessage;
 
+use crate::KatnissArrowError;
 use crate::Result;
 
 use self::builder_appending::append_all_fields;
@@ -42,8 +43,8 @@ impl RecordBatchConverter {
         self.builder.len()
     }
 
-    pub fn records(&mut self) -> core::result::Result<RecordBatch, ArrowError> {
-        self.try_into()
+    pub fn records(&mut self) -> Result<RecordBatch> {
+        RecordBatch::try_from(self).map_err(|e| KatnissArrowError::BatchConversionError(e))
     }
 }
 
