@@ -4,14 +4,21 @@ use katniss_pb2arrow::{
 };
 
 pub use crate::Result;
-struct ArrowBatchIngestor {
+pub struct ProtobufBatchIngestor {
     batch_size: usize,
     converter: RecordBatchConverter,
 }
 
-impl ArrowBatchIngestor {
-    fn ingest(&mut self, msg: DynamicMessage) -> Result<Option<RecordBatch>> {
+impl ProtobufBatchIngestor {
+    pub fn new(converter: RecordBatchConverter, batch_size: usize) -> Self {
+        Self {
+            batch_size,
+            converter,
+        }
+    }
+    pub fn ingest(&mut self, msg: DynamicMessage) -> Result<Option<RecordBatch>> {
         self.converter.append_message(&msg)?;
+
         if self.converter.len() >= self.batch_size {
             Ok(Some(self.converter.records()?))
         } else {

@@ -19,4 +19,7 @@ pub enum KatinssIngestorError {
 
     #[error("Failed to lock data")]
     OtherSharedBufferReferenceHeld,
+
+    #[error("No Schema found {0}")]
+    SchemaNotFound(String),
 }
