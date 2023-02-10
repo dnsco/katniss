@@ -25,4 +25,9 @@ impl ProtobufBatchIngestor {
             Ok(None)
         }
     }
+
+    pub fn finish(mut self) -> Result<RecordBatch> {
+        let records = self.converter.records()?;
+        Ok(records)
+    }
 }
