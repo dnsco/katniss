@@ -51,9 +51,11 @@ impl FsIngestor {
         })
     }
 
-    pub fn ingest(&mut self, packet: DynamicMessage) -> Result<()> {
-        if let Some(batch) = self.ingestor.ingest(packet)? {
-            self.writer.write(&batch)?;
+    pub fn ingest(&mut self, packets: Vec<DynamicMessage>) -> Result<()> {
+        for packet in packets {
+            if let Some(batch) = self.ingestor.ingest(packet)? {
+                self.writer.write(&batch)?;
+            }
         }
 
         Ok(())
