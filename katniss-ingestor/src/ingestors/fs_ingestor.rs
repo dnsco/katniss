@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::{fs::File, path::Path};
 
 use arrow_schema::SchemaRef;
 
@@ -6,7 +6,7 @@ use katniss_pb2arrow::{
     exports::prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor},
     RecordBatchConverter, SchemaConverter,
 };
-use parquet::{arrow::ArrowWriter, format::FileMetaData};
+use parquet::{arrow::ArrowWriter, file::properties::WriterProperties, format::FileMetaData};
 
 use crate::{arrow::ProtobufBatchIngestor, Result};
 
@@ -16,15 +16,15 @@ pub struct FsIngestor {
     ingestor: ProtobufBatchIngestor,
 }
 
-pub struct FsIngestorProps<'a> {
+pub struct FsIngestorProps<'a, P: AsRef<Path>> {
     pub pool: DescriptorPool,
-    pub filename: &'a str,
+    pub filename: P,
     pub msg_name: &'a str,
     pub arrow_record_batch_size: usize,
 }
 
 impl FsIngestor {
-    pub fn new(props: FsIngestorProps) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(props: FsIngestorProps<P>) -> Result<Self> {
         let converter = SchemaConverter::new(props.pool);
         let schema = SchemaRef::new(
             converter
@@ -42,7 +42,12 @@ impl FsIngestor {
         );
 
         let file = File::create(props.filename)?;
-        let writer = ArrowWriter::try_new(file, schema.clone(), None)?;
+
+        let props = WriterProperties::builder()
+            .set_max_row_group_size(1024 * 10)
+            .build();
+
+        let writer = ArrowWriter::try_new(file, schema.clone(), Some(props))?;
 
         Ok(Self {
             descriptor,
