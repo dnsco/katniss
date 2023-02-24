@@ -3,6 +3,7 @@
 //!
 
 mod errors;
+pub mod proto_repeated_consumer;
 mod record_conversion;
 mod schema_conversion;
 
