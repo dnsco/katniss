@@ -10,3 +10,4 @@ parquet = "33.0.0"
 katniss-pb2arrow = { path = "../katniss-pb2arrow" }
 thiserror = "1.0.38"
 arrow-schema = "33.0.0"
+itertools = "0.10.5"
