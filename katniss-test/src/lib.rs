@@ -29,4 +29,4 @@ fn descriptor_pool() -> Result<DescriptorPool> {
 }
 
 #[cfg(test)]
-mod tests;
+mod integration_tests;
