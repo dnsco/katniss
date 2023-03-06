@@ -1,40 +1,58 @@
 use std::path::Path;
 
-use crate::{
-    ingestors::lance_fs_ingestor::{LanceFsIngestor, LanceFsIngestorProps},
-    Result,
-};
+use crate::Result;
 
 use itertools::Itertools;
 use katniss_pb2arrow::{
-    exports::prost_reflect::bytes::Buf, proto_repeated_consumer::RepeatedDynamicMessages,
-    Result as ProtoResult,
+    exports::prost_reflect::{bytes::Buf, MessageDescriptor},
+    proto_repeated_consumer::RepeatedDynamicMessages,
+    ArrowBatchProps, Result as ProtoResult,
 };
 
-pub struct LargeRepeatedProtoIngestor<B: Buf> {
+use super::{
+    lance_fs_ingestor::LanceFsIngestor, parquet_fs::ParquetFileIngestor, stub_lance::StubLance,
+    BatchIngestor,
+};
+
+pub struct RepeatedProtoIngestor<B: Buf> {
     bytes: B,
-    packet_ingestor: LanceFsIngestor,
+    packet_ingestor: Box<dyn BatchIngestor>,
     arrow_batch_size: usize,
+    descriptor: MessageDescriptor,
 }
 
-impl<B: Buf> LargeRepeatedProtoIngestor<B> {
-    pub fn new<P: AsRef<Path>>(bytes: B, props: LanceFsIngestorProps<P>) -> Result<Self> {
-        let arrow_batch_size = props.arrow_record_batch_size;
-        let packet_ingestor = LanceFsIngestor::new(props)?;
+pub enum Serialization<P: AsRef<Path>> {
+    Parquet { filename: P },
+    Lance { filename: P },
+}
+
+impl<B: Buf> RepeatedProtoIngestor<B> {
+    pub fn new<P: AsRef<Path>>(
+        bytes: B,
+        arrow_props: ArrowBatchProps,
+        serialization: Serialization<P>,
+    ) -> Result<Self> {
+        let arrow_batch_size = arrow_props.arrow_record_batch_size;
+        let descriptor = arrow_props.descriptor.clone();
+        let packet_ingestor: Box<dyn BatchIngestor> = match serialization {
+            Serialization::Parquet { filename } => {
+                Box::new(ParquetFileIngestor::new(arrow_props, filename)?)
+            }
+            Serialization::Lance { filename } => {
+                Box::new(LanceFsIngestor::new(arrow_props, filename)?)
+            }
+        };
 
         Ok(Self {
             bytes,
+            descriptor,
             packet_ingestor,
             arrow_batch_size,
         })
     }
 
     pub fn ingest(mut self) -> Result<()> {
-        let messages = RepeatedDynamicMessages::iterator(
-            &mut self.bytes,
-            self.packet_ingestor.descriptor(),
-            1,
-        );
+        let messages = RepeatedDynamicMessages::iterator(&mut self.bytes, self.descriptor, 1);
 
         for chunk in messages.chunks(self.arrow_batch_size).into_iter() {
             self.packet_ingestor

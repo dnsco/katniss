@@ -24,7 +24,7 @@ pub fn schema_converter() -> Result<SchemaConverter> {
     Ok(SchemaConverter::new(pool))
 }
 
-fn descriptor_pool() -> Result<DescriptorPool> {
+pub fn descriptor_pool() -> Result<DescriptorPool> {
     Ok(DescriptorPool::decode(protos::FILE_DESCRIPTOR_BYTES)?)
 }
 

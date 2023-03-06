@@ -1,5 +1,4 @@
 pub mod arrow;
-pub mod buffer;
 pub mod errors;
 pub mod ingestors;
 pub mod parquet;

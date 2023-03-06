@@ -1,7 +1,8 @@
 use anyhow::Result;
-use katniss_ingestor::ingestors::{
-    lance_fs_ingestor::LanceFsIngestorProps, proto_repeated::LargeRepeatedProtoIngestor,
-};
+
+use katniss_ingestor::ingestors::proto_repeated::{RepeatedProtoIngestor, Serialization};
+use katniss_pb2arrow::ArrowBatchProps;
+
 use prost::Message;
 
 use crate::{
@@ -18,13 +19,15 @@ fn test_log_to_lance() -> Result<()> {
     }
     .encode_to_vec();
 
-    let ingestor = LargeRepeatedProtoIngestor::new(
+    let ingestor = RepeatedProtoIngestor::new(
         bytes,
-        LanceFsIngestorProps {
+        ArrowBatchProps::new(
+            descriptor_pool()?,
+            "eto.pb2arrow.tests.spacecorp.Packet".to_owned(),
+            1024,
+        )?,
+        Serialization::Lance {
             filename: "test_out.lance",
-            pool: descriptor_pool()?,
-            msg_name: "eto.pb2arrow.tests.spacecorp.Packet",
-            arrow_record_batch_size: 1024,
         },
     )?;
 

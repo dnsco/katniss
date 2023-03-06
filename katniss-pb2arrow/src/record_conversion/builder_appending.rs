@@ -6,7 +6,7 @@ use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 use crate::{KatnissArrowError, Result};
 
 pub fn append_all_fields(
-    fields: &Vec<Field>,
+    fields: &[Field],
     builder: &mut StructBuilder,
     msg: Option<&DynamicMessage>,
 ) -> Result<()> {
@@ -66,8 +66,8 @@ fn append_non_list_value(
     if let Some(fd) = fd_option.as_ref() {
         match fd.kind() {
             prost_reflect::Kind::Enum(_) => {
-                field_type = DataType::Dictionary(Box::new(DataType::Int32),
-                                                  Box::new(DataType::Utf8));
+                field_type =
+                    DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8));
             }
             _ => {}
         }
@@ -139,7 +139,11 @@ fn append_non_list_value(
                     let enum_value = enum_descriptor
                         .get_value(intval)
                         .ok_or_else(|| KatnissArrowError::NoEnumValue(intval))?;
-                    f.append_value(enum_value.name())
+
+                    f.append_value(enum_value.name());
+
+                    // f.append(enum_value.name())
+                    //     .map_err(KatnissArrowError::InvalidEnumValue)?;
                 }
                 None => f.append_null(),
             };
@@ -148,9 +152,9 @@ fn append_non_list_value(
         DataType::Struct(nested_fields) => {
             let b = field_builder::<StructBuilder>(struct_builder, i);
             match val {
-                Some(v) => append_all_fields(&nested_fields, b, v.as_message())?,
+                Some(v) => append_all_fields(&nested_fields[..], b, v.as_message())?,
                 None => {
-                    append_all_fields(&nested_fields, b, None)?;
+                    append_all_fields(&nested_fields[..], b, None)?;
                 }
             };
             Ok(())

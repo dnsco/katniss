@@ -8,8 +8,8 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::Command;
 
-use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use arrow_schema::DataType::Utf8;
+use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
 
@@ -79,17 +79,17 @@ impl FieldConverter {
             let item = Box::new(Field::new("item", data_type, true));
             Field::new(name, DataType::List(item), true)
         } else if matches!(data_type, DataType::Dictionary(_, _)) {
-/*            let enum_values = f
-                .kind()
-                .as_enum()
-                .unwrap()
-                .values()
-                .map(|v| v.name().to_string())
-                .collect::<Vec<_>>();
-            let is_ordered = enum_values.windows(2).all(|w| w[0] <= w[1]);
-            let dict_id = self.dictionaries.add_dictionary(enum_values);
-            Field::new_dict(name, data_type, true, dict_id, is_ordered)
- */
+            /*            let enum_values = f
+                           .kind()
+                           .as_enum()
+                           .unwrap()
+                           .values()
+                           .map(|v| v.name().to_string())
+                           .collect::<Vec<_>>();
+                       let is_ordered = enum_values.windows(2).all(|w| w[0] <= w[1]);
+                       let dict_id = self.dictionaries.add_dictionary(enum_values);
+                       Field::new_dict(name, data_type, true, dict_id, is_ordered)
+            */
             // hack until https://github.com/apache/arrow-rs/issues/3837 is resolved
             Field::new(name, Utf8, true)
         } else {
@@ -183,12 +183,6 @@ impl SchemaConverter {
         Ok(Self::new(pool))
     }
 
-    pub fn converter_for(&self, name: &str, batch_size: usize) -> Result<RecordBatchConverter> {
-        let schema = self.get_arrow_schema(name, &[])?.unwrap();
-        let schema = SchemaRef::new(schema);
-        RecordBatchConverter::try_new(schema, batch_size)
-    }
-
     /// Get the arrow schema of the protobuf message, specified by the qualified message name.
     pub fn get_arrow_schema(&self, name: &str, projection: &[&str]) -> Result<Option<Schema>> {
         let msg = match self.descriptor_pool.get_message_by_name(name) {
@@ -234,31 +228,6 @@ impl SchemaConverter {
             .get_message_by_name(name)
             .ok_or_else(|| KatnissArrowError::DescriptorNotFound(name.to_owned()))
     }
-
-    pub fn get_arrow_schemas_by_short_name(
-        &self,
-        short_name: &str,
-        projection: &[&str],
-    ) -> Result<Vec<Option<Schema>>> {
-        let descriptors = self
-            .descriptor_pool
-            .all_messages()
-            .filter(|m| m.name() == short_name)
-            .collect::<Vec<_>>();
-        let mut schemas = Vec::with_capacity(descriptors.len());
-        for m in descriptors {
-            schemas.push(self.get_arrow_schema(m.full_name(), projection)?);
-        }
-        Ok(schemas)
-    }
-
-    pub fn get_messages_from_short_name(&self, short_name: &str) -> Vec<Option<MessageDescriptor>> {
-        self.descriptor_pool
-            .all_messages()
-            .filter(|m| m.name() == short_name)
-            .map(|m| self.descriptor_pool.get_message_by_name(m.full_name()))
-            .collect()
-    }
 }
 
 fn project_fields(prefix: &str, fields: &Vec<Field>, projection: &HashSet<&str>) -> Vec<Field> {
@@ -273,19 +242,14 @@ fn project_fields(prefix: &str, fields: &Vec<Field>, projection: &HashSet<&str>)
         };
         if projection.contains(name.as_str()) {
             keep.push(f.clone());
-        } else {
-            match f.data_type() {
-                DataType::Struct(subfields) => {
-                    let subkeep = project_fields(name, subfields, projection);
-                    if subkeep.len() > 0 {
-                        keep.push(Field::new(
-                            f.name(),
-                            DataType::Struct(subkeep),
-                            f.is_nullable(),
-                        ));
-                    }
-                }
-                _ => {} // discard the field
+        } else if let DataType::Struct(subfields) = f.data_type() {
+            let subkeep = project_fields(name, subfields, projection);
+            if !subkeep.is_empty() {
+                keep.push(Field::new(
+                    f.name(),
+                    DataType::Struct(subkeep),
+                    f.is_nullable(),
+                ));
             }
         }
     }
