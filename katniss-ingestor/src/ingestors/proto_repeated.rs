@@ -29,10 +29,10 @@ pub enum Serialization<P: AsRef<Path>> {
 impl<B: Buf> RepeatedProtoIngestor<B> {
     pub fn new<P: AsRef<Path>>(
         bytes: B,
-        arrow_props: ArrowBatchProps,
+        arrow_props: &ArrowBatchProps,
         serialization: Serialization<P>,
     ) -> Result<Self> {
-        let arrow_batch_size = arrow_props.arrow_record_batch_size;
+        let arrow_batch_size = arrow_props.records_per_arrow_batch;
         let descriptor = arrow_props.descriptor.clone();
         let packet_ingestor: Box<dyn BatchIngestor> = match serialization {
             Serialization::Parquet { filename } => {

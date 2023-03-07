@@ -5,7 +5,7 @@ use katniss_ingestor::parquet::MultiBatchWriter;
 use prost::Message;
 use prost_reflect::DynamicMessage;
 
-use katniss_pb2arrow::{exports::RecordBatch, ArrowBatchProps, RecordBatchConverter};
+use katniss_pb2arrow::{exports::RecordBatch, ArrowBatchProps, RecordConverter};
 
 use crate::{descriptor_pool, schema_converter};
 
@@ -21,15 +21,16 @@ impl<'a, T: Message> ProtoBatch<'a, T> {
         let messages = self.messages();
         let msg_name = &self.msg_name();
 
-        let props = ArrowBatchProps::new(descriptor_pool()?, msg_name.to_owned(), messages.len())?;
+        let props = ArrowBatchProps::new(descriptor_pool()?, msg_name.to_owned())?
+            .with_records_per_arrow_batch(messages.len());
 
-        let mut converter = RecordBatchConverter::try_new(&props)?;
+        let mut converter = RecordConverter::try_new(&props)?;
 
         for m in messages {
             converter.append_message(&to_dynamic(m, msg_name)?)?;
         }
 
-        Ok(converter.records()?)
+        Ok(converter.records())
     }
 
     fn msg_name(&self) -> String {

@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use super::*;
 use crate::{
     protos::{
         spacecorp::{packet, ClimateStatus, JumpDriveStatus, Packet},
@@ -10,8 +9,8 @@ use crate::{
         },
     },
     schema_converter,
+    test_util::*,
 };
-use test_util::*;
 
 #[test]
 fn test_nested_unit_message() -> Result<()> {

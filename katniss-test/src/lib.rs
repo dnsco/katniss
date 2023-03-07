@@ -2,6 +2,7 @@ use anyhow::Result;
 use katniss_pb2arrow::SchemaConverter;
 use prost_reflect::DescriptorPool;
 
+pub mod test_util;
 pub mod protos {
     pub const FILE_DESCRIPTOR_BYTES: &[u8] =
         include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));

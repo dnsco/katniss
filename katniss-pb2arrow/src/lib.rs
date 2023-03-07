@@ -10,9 +10,10 @@ mod schema_conversion;
 use std::sync::Arc;
 
 use arrow_schema::{Schema, SchemaRef};
-pub use errors::{KatnissArrowError, Result};
 use prost_reflect::{DescriptorPool, MessageDescriptor};
-pub use record_conversion::RecordBatchConverter;
+
+pub use errors::{KatnissArrowError, Result};
+pub use record_conversion::RecordConverter;
 use schema_conversion::DictValuesContainer;
 pub use schema_conversion::SchemaConverter;
 
@@ -26,15 +27,11 @@ pub struct ArrowBatchProps {
     pub schema: Arc<Schema>,
     pub dictionaries: Arc<DictValuesContainer>,
     pub descriptor: MessageDescriptor,
-    pub arrow_record_batch_size: usize,
+    pub records_per_arrow_batch: usize,
 }
 
 impl ArrowBatchProps {
-    pub fn new(
-        pool: DescriptorPool,
-        msg_name: String,
-        arrow_record_batch_size: usize,
-    ) -> Result<Self> {
+    pub fn new(pool: DescriptorPool, msg_name: String) -> Result<Self> {
         let converter = SchemaConverter::new(pool);
         let (schema_opt, dictionaries_opt) =
             converter.get_arrow_schema_with_dictionaries(&msg_name, &[])?;
@@ -53,13 +50,19 @@ impl ArrowBatchProps {
             schema,
             dictionaries,
             descriptor,
-            arrow_record_batch_size,
+            records_per_arrow_batch: 1024,
         })
+    }
+
+    pub fn with_records_per_arrow_batch(mut self, size: usize) -> Self {
+        self.records_per_arrow_batch = size;
+        self
     }
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use arrow_array::builder::{Int32Builder, ListBuilder};
     use arrow_array::{
@@ -116,10 +119,10 @@ mod tests {
         let props = ArrowBatchProps::new(
             converter.descriptor_pool,
             "eto.pb2arrow.tests.v3.MessageWithNestedEnum".to_string(),
-            1024,
         )?;
 
-        RecordBatchConverter::try_new(&props)?;
+        RecordConverter::try_new(&props)?;
+
         Ok(())
     }
 
@@ -145,24 +148,23 @@ mod tests {
 
     //     let desc = converter.get_message_by_name(name).unwrap();
 
-    //     let struct_desc = converter
     //         .get_messages_from_short_name("Struct")
     //         .remove(0)
     //         .unwrap();
 
-    //     for i in 0..2 {
-    //         let mut msg = DynamicMessage::new(desc.clone());
-    //         let mut s = DynamicMessage::new(struct_desc.clone());
-    //         msg.set_field_by_name("a", Value::List(vec![Value::I32(i)]));
-    //         msg.set_field_by_name("b", Value::Bool(i % 2 == 0));
-    //         if i % 2 == 0 {
-    //             msg.set_field_by_name("d", Value::F64(i as f64));
-    //             s.set_field_by_name("v1", Value::U64(i as u64));
-    //         }
-    //         msg.set_field_by_name("s", Value::Message(s));
-    //         c.append_message(&msg).unwrap();
+    // for i in 0..2 {
+    //     let mut msg = DynamicMessage::new(desc.clone());
+    //     let mut s = DynamicMessage::new(struct_desc.clone());
+    //     msg.set_field_by_name("a", Value::List(vec![Value::I32(i)]));
+    //     msg.set_field_by_name("b", Value::Bool(i % 2 == 0));
+    //     if i % 2 == 0 {
+    //         msg.set_field_by_name("d", Value::F64(i as f64));
+    //         s.set_field_by_name("v1", Value::U64(i as u64));
     //     }
-    //     let actual = RecordBatch::try_from(&mut c).unwrap();
+    //     msg.set_field_by_name("s", Value::Message(s));
+    //     c.append_message(&msg).unwrap();
+    // }
+    // let actual = c.records();
 
     //     let v1: Field = Field::new("v1", DataType::UInt64, true);
     //     let expected_schema = Schema::new(vec![

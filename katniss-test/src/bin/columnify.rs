@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let ingestor = RepeatedProtoIngestor::new(
         &source_file[..],
-        ArrowBatchProps::new(descriptor_pool()?, "Packet".to_owned(), 1024)?,
+        &ArrowBatchProps::new(descriptor_pool()?, "Packet".to_owned())?,
         cli.serialization(),
     )?;
 

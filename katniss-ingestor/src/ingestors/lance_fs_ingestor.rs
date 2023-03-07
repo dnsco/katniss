@@ -9,13 +9,13 @@ use katniss_pb2arrow::exports::prost_reflect::{DescriptorPool, DynamicMessage, M
 use katniss_pb2arrow::exports::{RecordBatch, RecordBatchReader};
 use tokio::runtime::Runtime;
 
-use crate::{arrow::ProtobufIngestor, Result};
+use crate::{arrow::ProtobufBatchIngestor, Result};
 
 use super::BatchIngestor;
 
 pub struct LanceFsIngestor {
     descriptor: MessageDescriptor,
-    ingestor: ProtobufIngestor,
+    ingestor: ProtobufBatchIngestor,
     rt: Arc<Runtime>,
     filename: String,
     params: WriteParams,
@@ -30,9 +30,9 @@ pub struct LanceFsIngestorProps<'a, P: AsRef<Path>> {
 }
 
 impl LanceFsIngestor {
-    pub fn new<P: AsRef<Path>>(props: ArrowBatchProps, filename: P) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(props: &ArrowBatchProps, filename: P) -> Result<Self> {
         let descriptor = props.descriptor.clone();
-        let ingestor = ProtobufIngestor::new(props)?;
+        let ingestor = ProtobufBatchIngestor::new(props)?;
 
         let filename = filename.as_ref().to_str().unwrap().to_string();
 
