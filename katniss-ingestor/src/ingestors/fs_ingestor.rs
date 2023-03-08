@@ -37,7 +37,7 @@ impl FsIngestor {
         let descriptor = converter.get_message_by_name(props.msg_name)?;
 
         let ingestor = ProtobufBatchIngestor::new(
-            RecordBatchConverter::new(schema.clone(), props.arrow_record_batch_size),
+            RecordBatchConverter::try_new(schema.clone(), props.arrow_record_batch_size)?,
             props.arrow_record_batch_size,
         );
 

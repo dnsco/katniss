@@ -3,11 +3,12 @@ use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, SchemaRef};
 use prost_reflect::DynamicMessage;
 
+use crate::schema_conversion::DictValuesContainer;
 use crate::KatnissArrowError;
 use crate::Result;
 
 use self::builder_appending::append_all_fields;
-use self::builder_creation::make_struct_builder;
+use self::builder_creation::BuilderFactory;
 
 mod builder_appending;
 mod builder_creation;
@@ -21,12 +22,28 @@ pub struct RecordBatchConverter {
 }
 
 impl RecordBatchConverter {
-    pub fn new(schema: SchemaRef, batch_size: usize) -> RecordBatchConverter {
-        RecordBatchConverter {
-            builder: make_struct_builder(schema.fields().clone(), batch_size),
+    pub fn try_new(schema: SchemaRef, batch_size: usize) -> Result<Self> {
+        let factory = BuilderFactory::new();
+        let builder = factory.try_from_fields(schema.fields().clone(), batch_size)?;
+        Ok(RecordBatchConverter {
             schema,
             batch_size,
-        }
+            builder,
+        })
+    }
+
+    pub fn try_new_with_dictionaries(
+        schema: SchemaRef,
+        batch_size: usize,
+        dictionaries: DictValuesContainer,
+    ) -> Result<Self> {
+        let factory = BuilderFactory::new_with_dictionary(dictionaries);
+        let builder = factory.try_from_fields(schema.fields().clone(), batch_size)?;
+        Ok(RecordBatchConverter {
+            schema,
+            batch_size,
+            builder,
+        })
     }
 
     /// Append a new protobuf message to this batch
