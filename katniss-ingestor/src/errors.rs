@@ -1,7 +1,13 @@
-use std::time::SystemTimeError;
+use std::{
+    fmt::Debug,
+    sync::mpsc::{RecvError, SendError},
+    time::SystemTimeError,
+};
 
 use katniss_pb2arrow::KatnissArrowError;
 use thiserror::Error;
+
+use crate::pipeline::{TemporalBuffer, TemporalBytes};
 
 #[derive(Error, Debug)]
 pub enum KatinssIngestorError {
@@ -17,6 +23,12 @@ pub enum KatinssIngestorError {
     #[error("Timelord Error: {0}")]
     TimeyWimeyStuff(#[from] SystemTimeError),
 
-    #[error("Failed to lock data")]
-    OtherSharedBufferReferenceHeld,
+    #[error("Pipeline Clog: {0}")]
+    BufferRecv(#[from] RecvError),
+
+    #[error("Temporal Pipeline Clog: {0}")]
+    TemporalBufferSend(#[from] SendError<TemporalBuffer>),
+
+    #[error("Parquet Pipeline Clog: {0}")]
+    ParquetBufferSend(#[from] SendError<TemporalBytes>),
 }

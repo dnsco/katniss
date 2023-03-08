@@ -24,7 +24,7 @@ impl ParquetFileIngestor {
 
         let writer = ArrowWriter::try_new(file, arrow_props.schema.clone(), Some(writer_props))?;
 
-        let ingestor = ProtobufBatchIngestor::new(arrow_props)?;
+        let ingestor = ProtobufBatchIngestor::try_new(arrow_props)?;
 
         Ok(Self { writer, ingestor })
     }

@@ -12,11 +12,7 @@ pub struct ProtobufBatchIngestor {
 }
 
 impl ProtobufBatchIngestor {
-    pub fn new(props: &ArrowBatchProps) -> Result<Self> {
-        let batch_size = props.records_per_arrow_batch;
-
-        let converter = RecordConverter::try_new(&props)?;
-
+    pub fn try_new(props: &ArrowBatchProps) -> Result<Self> {
         Ok(Self {
             batch_size: props.records_per_arrow_batch,
             converter: RecordConverter::try_from(props)?,

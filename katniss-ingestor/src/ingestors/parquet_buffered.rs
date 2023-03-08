@@ -32,7 +32,7 @@ impl BufferedParquetIngestor {
             props.arrow_batches_per_parquet,
         )?;
 
-        let ingestor = ProtobufBatchIngestor::new(arrow_props)?;
+        let ingestor = ProtobufBatchIngestor::try_new(arrow_props)?;
 
         Ok(Self { writer, ingestor })
     }

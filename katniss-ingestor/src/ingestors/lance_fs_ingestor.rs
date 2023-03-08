@@ -32,7 +32,7 @@ pub struct LanceFsIngestorProps<'a, P: AsRef<Path>> {
 impl LanceFsIngestor {
     pub fn new<P: AsRef<Path>>(props: &ArrowBatchProps, filename: P) -> Result<Self> {
         let descriptor = props.descriptor.clone();
-        let ingestor = ProtobufBatchIngestor::new(props)?;
+        let ingestor = ProtobufBatchIngestor::try_new(props)?;
 
         let filename = filename.as_ref().to_str().unwrap().to_string();
 

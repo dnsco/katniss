@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 parquet = "33.0.0"
+chrono = "0.4.23"
 katniss-pb2arrow = { path = "../katniss-pb2arrow" }
 thiserror = "1.0.39"
 arrow-schema = "33.0.0"
@@ -22,3 +23,4 @@ tokio = { version = "1.0", default-features = false, features = [
 [dev-dependencies]
 anyhow = "1.0.69"
 katniss-test = { path = "../katniss-test" }
+tempfile = "3.4.0"
