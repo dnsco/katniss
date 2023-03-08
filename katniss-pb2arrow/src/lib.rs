@@ -71,7 +71,7 @@ mod tests {
             DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8))
         );
 
-        RecordBatchConverter::new(schema, 1);
+        RecordBatchConverter::try_new(schema, 1)?;
         Ok(())
     }
 
@@ -91,7 +91,7 @@ mod tests {
             .remove(0)
             .unwrap();
 
-        let mut c = RecordBatchConverter::new(SchemaRef::from(schema.clone()), 10);
+        let mut c = RecordBatchConverter::try_new(SchemaRef::from(schema.clone()), 10).unwrap();
 
         let desc = converter
             .get_messages_from_short_name(short_name)

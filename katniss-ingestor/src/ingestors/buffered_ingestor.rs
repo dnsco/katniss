@@ -38,7 +38,7 @@ impl BufferedArrowParquetFileIngestor {
             props.arrow_batches_per_parquet,
         )?;
         let ingestor = ProtobufBatchIngestor::new(
-            RecordBatchConverter::new(schema.clone(), props.arrow_record_batch_size),
+            RecordBatchConverter::try_new(schema.clone(), props.arrow_record_batch_size)?,
             props.arrow_record_batch_size,
         );
 

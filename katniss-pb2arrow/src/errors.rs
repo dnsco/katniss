@@ -34,6 +34,15 @@ pub enum KatnissArrowError {
     #[error("Batch Conversion Error: {0}")]
     BatchConversionError(ArrowError),
 
+    #[error("Can only iterate over WireType::LengthDelimited but is {0:?}")]
+    NotLengthDelimted(WireType),
+
+    #[error("Protobuf Decode Error {0}")]
+    ProtoDecodeError(#[from] DecodeError),
+
+    #[error("Proto bytes ({0}) too big for platform")]
+    TooManyBytesForPlatform(u64),
+
     #[error("Arrow Dictionary Field must have dict_id")]
     DictNotFound,
 }

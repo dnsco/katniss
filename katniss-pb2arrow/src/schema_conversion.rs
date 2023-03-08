@@ -179,7 +179,7 @@ impl SchemaConverter {
     pub fn converter_for(&self, name: &str, batch_size: usize) -> Result<RecordBatchConverter> {
         let schema = self.get_arrow_schema(name, &[])?.unwrap();
         let schema = SchemaRef::new(schema);
-        Ok(RecordBatchConverter::new(schema, batch_size))
+        RecordBatchConverter::try_new(schema, batch_size)
     }
 
     /// Get the arrow schema of the protobuf message, specified by the qualified message name.
