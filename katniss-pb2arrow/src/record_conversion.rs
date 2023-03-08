@@ -3,9 +3,9 @@ use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, SchemaRef};
 use prost_reflect::DynamicMessage;
 
+use crate::schema_conversion::DictValuesContainer;
 use crate::KatnissArrowError;
 use crate::Result;
-use crate::schema_conversion::DictValuesContainer;
 
 use self::builder_appending::append_all_fields;
 use self::builder_creation::BuilderFactory;
@@ -32,7 +32,11 @@ impl RecordBatchConverter {
         })
     }
 
-    pub fn try_new_with_dictionaries(schema: SchemaRef, batch_size: usize, dictionaries: DictValuesContainer) -> Result<Self> {
+    pub fn try_new_with_dictionaries(
+        schema: SchemaRef,
+        batch_size: usize,
+        dictionaries: DictValuesContainer,
+    ) -> Result<Self> {
         let factory = BuilderFactory::new_with_dictionary(dictionaries);
         let builder = factory.try_from_fields(schema.fields().clone(), batch_size)?;
         Ok(RecordBatchConverter {

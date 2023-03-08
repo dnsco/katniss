@@ -1,8 +1,8 @@
 //! Convert Protobuf schema and message into Apache Arrow Schema and Tables.
 //!
 
-use std::cell::RefCell;
 use arrow_array::StringArray;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Read};
 use std::path::Path;
@@ -139,7 +139,10 @@ pub struct SchemaConverter {
 impl SchemaConverter {
     pub fn new(descriptor_pool: DescriptorPool) -> Self {
         let dictionary_map = RefCell::new(HashMap::new());
-        Self { descriptor_pool, dictionary_map }
+        Self {
+            descriptor_pool,
+            dictionary_map,
+        }
     }
     /// Compile protobuf files and build the converter.
     ///
@@ -194,7 +197,9 @@ impl SchemaConverter {
                 .map(|f| field_converter.to_arrow_mut(&f))
                 .collect(),
         );
-        self.dictionary_map.borrow_mut().insert(name.to_string(), field_converter.dictionaries.clone());
+        self.dictionary_map
+            .borrow_mut()
+            .insert(name.to_string(), field_converter.dictionaries.clone());
 
         if projection.is_empty() {
             Ok(Some(schema))
@@ -206,9 +211,17 @@ impl SchemaConverter {
         }
     }
 
-    pub fn get_arrow_schema_with_dictionaries(&self, name: &str, projection: &[&str]) -> Result<(Option<Schema>, Option<DictValuesContainer>)> {
+    pub fn get_arrow_schema_with_dictionaries(
+        &self,
+        name: &str,
+        projection: &[&str],
+    ) -> Result<(Option<Schema>, Option<DictValuesContainer>)> {
         let rs = self.get_arrow_schema(name, projection)?;
-        let dict_values = self.dictionary_map.borrow_mut().get(name).map(|v| v.clone());
+        let dict_values = self
+            .dictionary_map
+            .borrow_mut()
+            .get(name)
+            .map(|v| v.clone());
         Ok((rs, dict_values))
     }
 
@@ -223,7 +236,11 @@ impl SchemaConverter {
         short_name: &str,
         projection: &[&str],
     ) -> Result<Vec<Option<Schema>>> {
-        let descriptors = self.descriptor_pool.all_messages().filter(|m| m.name() == short_name).collect::<Vec<_>>();
+        let descriptors = self
+            .descriptor_pool
+            .all_messages()
+            .filter(|m| m.name() == short_name)
+            .collect::<Vec<_>>();
         let mut schemas = Vec::with_capacity(descriptors.len());
         for m in descriptors {
             schemas.push(self.get_arrow_schema(m.full_name(), projection)?);

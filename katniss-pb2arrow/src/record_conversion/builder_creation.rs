@@ -3,11 +3,11 @@ use arrow_array::types::Int32Type;
 use arrow_schema::{DataType, Field};
 
 use crate::errors::Result;
-use crate::KatnissArrowError::{DictNotFound, BatchConversionError};
 use crate::schema_conversion::DictValuesContainer;
+use crate::KatnissArrowError::{BatchConversionError, DictNotFound};
 
 pub struct BuilderFactory {
-    dictionaries: Option<DictValuesContainer>
+    dictionaries: Option<DictValuesContainer>,
 }
 
 impl BuilderFactory {
@@ -16,11 +16,16 @@ impl BuilderFactory {
     }
 
     pub fn new_with_dictionary(dictionaries: DictValuesContainer) -> Self {
-        BuilderFactory { dictionaries: Some(dictionaries) }
+        BuilderFactory {
+            dictionaries: Some(dictionaries),
+        }
     }
 
     pub fn try_from_fields(&self, fields: Vec<Field>, capacity: usize) -> Result<StructBuilder> {
-        let field_builders: Vec<Box<dyn ArrayBuilder>> = fields.iter().map(|f| self.make_builder(f, capacity)).collect::<Result<Vec<_>>>()?;
+        let field_builders: Vec<Box<dyn ArrayBuilder>> = fields
+            .iter()
+            .map(|f| self.make_builder(f, capacity))
+            .collect::<Result<Vec<_>>>()?;
         Ok(StructBuilder::new(fields, field_builders))
     }
 
@@ -53,16 +58,20 @@ impl BuilderFactory {
                 // Protobuf enums are int32 -> string
                 let dict_builder = match self.dictionaries.as_ref() {
                     Some(d) => {
-                        let dict_values = inner_field.dict_id()
+                        let dict_values = inner_field
+                            .dict_id()
                             .map(|dict_id| d.get_dict_values(dict_id))
                             .flatten()
                             .ok_or_else(|| DictNotFound)?;
-                        StringDictionaryBuilder::<Int32Type>::new_with_dictionary(capacity, dict_values)
-                            .map_err(|err| BatchConversionError(err))?
+                        StringDictionaryBuilder::<Int32Type>::new_with_dictionary(
+                            capacity,
+                            dict_values,
+                        )
+                        .map_err(|err| BatchConversionError(err))?
                     }
-                    None => {
-                        StringDictionaryBuilder::<Int32Type>::with_capacity(capacity, capacity, capacity)
-                    }
+                    None => StringDictionaryBuilder::<Int32Type>::with_capacity(
+                        capacity, capacity, capacity,
+                    ),
                 };
                 wrap_builder(dict_builder, kind)
             }
@@ -73,7 +82,6 @@ impl BuilderFactory {
         }
     }
 }
-
 
 enum ListKind {
     List,
