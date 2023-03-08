@@ -1,10 +1,11 @@
 //! Convert Protobuf schema and message into Apache Arrow Schema and Tables.
 //!
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::Command;
+use arrow_array::StringArray;
 
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
@@ -16,6 +17,33 @@ use crate::{KatnissArrowError, RecordBatchConverter, Result};
 #[derive(Debug, Clone)]
 pub struct SchemaConverter {
     pub(crate) descriptor_pool: DescriptorPool,
+}
+
+/// Not threadsafe
+#[derive(Debug, Clone)]
+pub struct DictValuesContainer {
+    /// Arrow Field.dict_id -> dictionary values
+    dictionaries: HashMap<i64, StringArray>
+}
+
+impl DictValuesContainer {
+    pub fn new() -> Self {
+        let dictionaries = HashMap::new();
+        DictValuesContainer { dictionaries }
+    }
+
+    /// Add a new set of dictionary values and return dict_id
+    pub fn add_dictionary(&mut self, dict_values: Vec<String>) -> i64 {
+        // dict_id is 0 by default in Arrow Field so we start at 1 to distinguish
+        let new_id = self.dictionaries.keys().max().unwrap_or(&(0 as i64)).clone() + 1;
+        self.dictionaries.insert(new_id, StringArray::from_iter_values(dict_values.iter()));
+        new_id
+    }
+
+    /// Get the dictionary values for the specified dict_id
+    pub fn get_dict_values(&self, dict_id: i64) -> Option<&StringArray> {
+        self.dictionaries.get(&dict_id)
+    }
 }
 
 /// Convert prost FieldDescriptor to arrow Field
@@ -193,4 +221,24 @@ fn project_fields(prefix: &str, fields: &Vec<Field>, projection: &HashSet<&str>)
         }
     }
     keep
+}
+
+
+//         let values = f.kind().as_enum().unwrap().values().map(|v| v.name().to_string()).collect::<Vec<_>>();
+
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_dictvaluescontainer() {
+        let mut holder = DictValuesContainer::new();
+        assert!(holder.get_dict_values(0).is_none());
+        assert_eq!(holder.add_dictionary(vec!["a".to_string()]), 1);
+        assert_eq!(holder.get_dict_values(1).unwrap().iter().map(|v| v.unwrap().to_string()).collect::<Vec<_>>(),
+                   vec!["a".to_string()]);
+    }
+
 }
