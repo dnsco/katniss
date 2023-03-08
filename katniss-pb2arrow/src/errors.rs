@@ -28,20 +28,14 @@ pub enum KatnissArrowError {
     #[error("Couldn't find protoc on path")]
     ProtocError(#[from] which::Error),
 
-    #[error("Io Errror")]
+    #[error("Io Error")]
     IoError(#[from] std::io::Error),
 
     #[error("Batch Conversion Error: {0}")]
     BatchConversionError(ArrowError),
 
-    #[error("Can only iterate over WireType::LengthDelimited but is {0:?}")]
-    NotLengthDelimted(WireType),
-
-    #[error("Protobuf Decode Error {0}")]
-    ProtoDecodeError(#[from] DecodeError),
-
-    #[error("Proto bytes ({0}) too big for platform")]
-    TooManyBytesForPlatform(u64),
+    #[error("Arrow Dictionary Field must have dict_id")]
+    DictNotFound,
 }
 
 pub type Result<T> = core::result::Result<T, KatnissArrowError>;
