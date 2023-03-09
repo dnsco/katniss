@@ -31,7 +31,7 @@ pub struct ArrowBatchProps {
 }
 
 impl ArrowBatchProps {
-    pub fn new(pool: DescriptorPool, msg_name: String) -> Result<Self> {
+    pub fn try_new(pool: DescriptorPool, msg_name: String) -> Result<Self> {
         let converter = SchemaConverter::new(pool);
         let (schema_opt, dictionaries_opt) =
             converter.get_arrow_schema_with_dictionaries(&msg_name, &[])?;
@@ -110,7 +110,7 @@ mod tests {
             DataType::Utf8
         );
 
-        let props = ArrowBatchProps::new(
+        let props = ArrowBatchProps::try_new(
             converter.descriptor_pool,
             "eto.pb2arrow.tests.v3.MessageWithNestedEnum".to_string(),
         )?;

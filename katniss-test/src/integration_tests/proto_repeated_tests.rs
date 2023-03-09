@@ -21,7 +21,7 @@ fn test_log_to_lance() -> Result<()> {
 
     let ingestor = RepeatedProtoIngestor::new(
         bytes,
-        &ArrowBatchProps::new(
+        &ArrowBatchProps::try_new(
             descriptor_pool()?,
             "eto.pb2arrow.tests.spacecorp.Packet".to_owned(),
         )?,
