@@ -12,7 +12,7 @@ pub use record_conversion::RecordBatchConverter;
 pub use schema_conversion::SchemaConverter;
 
 pub mod exports {
-    pub use arrow_array::RecordBatch;
+    pub use arrow_array::{RecordBatch, RecordBatchReader};
     pub use prost_reflect;
     pub use prost_reflect::DynamicMessage;
 }

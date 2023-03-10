@@ -9,6 +9,7 @@ use std::path::Path;
 use std::process::Command;
 
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use arrow_schema::DataType::Utf8;
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
 
@@ -78,7 +79,7 @@ impl FieldConverter {
             let item = Box::new(Field::new("item", data_type, true));
             Field::new(name, DataType::List(item), true)
         } else if matches!(data_type, DataType::Dictionary(_, _)) {
-            let enum_values = f
+/*            let enum_values = f
                 .kind()
                 .as_enum()
                 .unwrap()
@@ -88,6 +89,9 @@ impl FieldConverter {
             let is_ordered = enum_values.windows(2).all(|w| w[0] <= w[1]);
             let dict_id = self.dictionaries.add_dictionary(enum_values);
             Field::new_dict(name, data_type, true, dict_id, is_ordered)
+ */
+            // hack until https://github.com/apache/arrow-rs/issues/3837 is resolved
+            Field::new(name, Utf8, true)
         } else {
             Field::new(name, data_type, true)
         }

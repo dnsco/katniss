@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    ingestors::fs_ingestor::{FsIngestor, FsIngestorProps},
+    ingestors::lance_fs_ingestor::{LanceFsIngestor, LanceFsIngestorProps},
     Result,
 };
 
@@ -13,14 +13,14 @@ use katniss_pb2arrow::{
 
 pub struct LargeRepeatedProtoIngestor<B: Buf> {
     bytes: B,
-    packet_ingestor: FsIngestor,
+    packet_ingestor: LanceFsIngestor,
     arrow_batch_size: usize,
 }
 
 impl<B: Buf> LargeRepeatedProtoIngestor<B> {
-    pub fn new<P: AsRef<Path>>(bytes: B, props: FsIngestorProps<P>) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(bytes: B, props: LanceFsIngestorProps<P>) -> Result<Self> {
         let arrow_batch_size = props.arrow_record_batch_size;
-        let packet_ingestor = FsIngestor::new(props)?;
+        let packet_ingestor = LanceFsIngestor::new(props)?;
 
         Ok(Self {
             bytes,

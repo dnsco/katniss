@@ -1,6 +1,6 @@
 use anyhow::Result;
 use katniss_ingestor::ingestors::{
-    fs_ingestor::FsIngestorProps, proto_repeated::LargeRepeatedProtoIngestor,
+    lance_fs_ingestor::LanceFsIngestorProps, proto_repeated::LargeRepeatedProtoIngestor,
 };
 use prost::Message;
 
@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[test]
-fn test_log_to_parquet() -> Result<()> {
+fn test_log_to_lance() -> Result<()> {
     let bytes: &[u8] = &Log {
         // TODO: Make some helpers that make different kinds of packets with data
         packets: vec![Packet::default(), Packet::default(), Packet::default()],
@@ -19,8 +19,8 @@ fn test_log_to_parquet() -> Result<()> {
 
     let ingestor = LargeRepeatedProtoIngestor::new(
         bytes,
-        FsIngestorProps {
-            filename: "test_out.parquet",
+        LanceFsIngestorProps {
+            filename: "test_out.lance",
             pool: descriptor_pool()?,
             msg_name: "eto.pb2arrow.tests.spacecorp.Packet",
             arrow_record_batch_size: 1024,
