@@ -82,10 +82,11 @@ impl LanceFsIngestor {
         Ok(())
     }
 
-    pub fn finish(self) -> Result<()> {
+    pub fn finish(mut self) -> Result<()> {
         let batch = self.ingestor.finish()?;
-        // TODO write here
-        // self.write(batch.clone())?;
+        if batch.num_rows() > 0 {
+            self.batches.push(batch);
+        }
 
         let mut reader : Box<dyn RecordBatchReader> = Box::new(RecordBatchBuffer::new(self.batches));
         self.rt.block_on(async {

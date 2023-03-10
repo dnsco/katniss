@@ -11,6 +11,7 @@ use crate::{
 
 #[test]
 fn test_log_to_lance() -> Result<()> {
+    std::fs::remove_dir_all("test_out.lance");
     let bytes: &[u8] = &Log {
         // TODO: Make some helpers that make different kinds of packets with data
         packets: vec![Packet::default(), Packet::default(), Packet::default()],
@@ -28,6 +29,5 @@ fn test_log_to_lance() -> Result<()> {
     )?;
 
     ingestor.ingest()?;
-
     Ok(())
 }

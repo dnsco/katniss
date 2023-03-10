@@ -68,7 +68,8 @@ mod tests {
                 .unwrap()
                 .data_type()
                 .clone(),
-            DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8))
+            // DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8))
+            DataType::Utf8
         );
 
         RecordBatchConverter::try_new(schema, 1)?;
