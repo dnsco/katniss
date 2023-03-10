@@ -12,7 +12,7 @@ pub use record_conversion::RecordBatchConverter;
 pub use schema_conversion::SchemaConverter;
 
 pub mod exports {
-    pub use arrow_array::RecordBatch;
+    pub use arrow_array::{RecordBatch, RecordBatchReader};
     pub use prost_reflect;
     pub use prost_reflect::DynamicMessage;
 }
@@ -68,7 +68,8 @@ mod tests {
                 .unwrap()
                 .data_type()
                 .clone(),
-            DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8))
+            // DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8))
+            DataType::Utf8
         );
 
         RecordBatchConverter::try_new(schema, 1)?;

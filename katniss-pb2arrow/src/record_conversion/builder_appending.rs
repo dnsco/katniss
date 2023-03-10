@@ -1,5 +1,5 @@
 use arrow_array::builder::*;
-use arrow_array::types::Int32Type;
+use arrow_array::types::{Int32Type, Utf8Type};
 use arrow_schema::{DataType, Field};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 
@@ -61,7 +61,19 @@ fn append_non_list_value(
         cow.as_deref()
     };
 
-    match f.data_type() {
+    // hack until https://github.com/apache/arrow-rs/issues/3837 is fixed
+    let mut field_type = f.data_type().clone();
+    if let Some(fd) = fd_option.as_ref() {
+        match fd.kind() {
+            prost_reflect::Kind::Enum(_) => {
+                field_type = DataType::Dictionary(Box::new(DataType::Int32),
+                                                  Box::new(DataType::Utf8));
+            }
+            _ => {}
+        }
+    }
+
+    match field_type {
         DataType::Float64 => extend_builder(
             field_builder::<Float64Builder>(struct_builder, i),
             parse_val(val, Value::as_f64)?,
@@ -112,12 +124,14 @@ fn append_non_list_value(
             },
         ),
         DataType::Dictionary(_, _) => {
-            let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
+            // hack until https://github.com/apache/arrow-rs/issues/3837 is fixed
+            // let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
+            let f = field_builder::<StringBuilder>(struct_builder, i);
 
-            let intval = val.and_then(|v| v.as_i32());
+            let intval = val.and_then(|v| v.as_enum_number());
             match intval {
                 Some(intval) => {
-                    let kind = fd_option.unwrap().kind();
+                    let kind = fd_option.as_ref().unwrap().kind();
                     let enum_descriptor = kind
                         .as_enum()
                         .ok_or_else(|| KatnissArrowError::NonEnumField)?;
@@ -125,8 +139,7 @@ fn append_non_list_value(
                     let enum_value = enum_descriptor
                         .get_value(intval)
                         .ok_or_else(|| KatnissArrowError::NoEnumValue(intval))?;
-                    f.append(enum_value.name())
-                        .map_err(|err| KatnissArrowError::InvalidEnumValue(err))?;
+                    f.append_value(enum_value.name())
                 }
                 None => f.append_null(),
             };

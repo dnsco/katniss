@@ -22,4 +22,7 @@ pub enum KatinssIngestorError {
 
     #[error("No Schema found {0}")]
     SchemaNotFound(String),
+    
+    #[error("No Dictionary found {0}")]
+    DictionaryNotFound(String),
 }

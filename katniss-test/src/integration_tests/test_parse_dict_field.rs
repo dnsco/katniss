@@ -13,7 +13,7 @@ use crate::{
 };
 use test_util::*;
 
-#[test]
+#[test] #[ignore]
 fn test_parse_dict_field_values() -> Result<()> {
     let mut converter = schema_converter()?;
 
