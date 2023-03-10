@@ -31,13 +31,7 @@ impl DictValuesContainer {
     /// Add a new set of dictionary values and return dict_id
     pub fn add_dictionary(&mut self, dict_values: Vec<String>) -> i64 {
         // dict_id is 0 by default in Arrow Field so we start at 1 to distinguish
-        let new_id = self
-            .dictionaries
-            .keys()
-            .max()
-            .unwrap_or(&(0 as i64))
-            .clone()
-            + 1;
+        let new_id = self.dictionaries.keys().max().cloned().unwrap_or(0) + 1;
         self.dictionaries
             .insert(new_id, StringArray::from_iter_values(dict_values.iter()));
         new_id
@@ -46,6 +40,12 @@ impl DictValuesContainer {
     /// Get the dictionary values for the specified dict_id
     pub fn get_dict_values(&self, dict_id: i64) -> Option<&StringArray> {
         self.dictionaries.get(&dict_id)
+    }
+}
+
+impl Default for DictValuesContainer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -197,7 +197,7 @@ impl SchemaConverter {
         );
         self.dictionary_map
             .borrow_mut()
-            .insert(name.to_string(), field_converter.dictionaries.clone());
+            .insert(name.to_string(), field_converter.dictionaries);
 
         if projection.is_empty() {
             Ok(Some(schema))
@@ -215,11 +215,7 @@ impl SchemaConverter {
         projection: &[&str],
     ) -> Result<(Option<Schema>, Option<DictValuesContainer>)> {
         let rs = self.get_arrow_schema(name, projection)?;
-        let dict_values = self
-            .dictionary_map
-            .borrow_mut()
-            .get(name)
-            .map(|v| v.clone());
+        let dict_values = self.dictionary_map.borrow_mut().get(name).cloned();
         Ok((rs, dict_values))
     }
 

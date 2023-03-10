@@ -62,17 +62,11 @@ impl ArrowBatchProps {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use arrow_schema::{DataType, Field, Schema, SchemaRef};
 
     use super::*;
-    use arrow_array::builder::{Int32Builder, ListBuilder};
-    use arrow_array::{
-        ArrayRef, BooleanArray, Float64Array, RecordBatch, StructArray, UInt64Array,
-    };
-    use arrow_schema::{DataType, Field, Schema, SchemaRef};
-    use prost_reflect::{DynamicMessage, Value};
-
-    use std::path::PathBuf;
-    use std::sync::Arc;
 
     fn converter_for(proto_file: &str) -> SchemaConverter {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

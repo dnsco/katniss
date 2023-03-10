@@ -56,14 +56,13 @@ impl BuilderFactory {
 
                 let dict_values = inner_field
                     .dict_id()
-                    .map(|dict_id| d.get_dict_values(dict_id))
-                    .flatten()
+                    .and_then(|dict_id| d.get_dict_values(dict_id))
                     .ok_or_else(|| DictNotFound)?;
                 let builder = StringDictionaryBuilder::<Int32Type>::new_with_dictionary(
                     capacity,
                     dict_values,
                 )
-                .map_err(|err| BatchConversionError(err))?;
+                .map_err(BatchConversionError)?;
 
                 wrap_builder(builder, kind)
             }
