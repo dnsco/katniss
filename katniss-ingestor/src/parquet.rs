@@ -7,7 +7,6 @@ use std::{
 use arrow_schema::SchemaRef;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 
-use crate::buffer::SharedBuffer;
 use crate::Result;
 use katniss_pb2arrow::exports::RecordBatch;
 
@@ -67,21 +66,18 @@ impl MultiBatchWriter {
 
 struct ParquetBuffer {
     filename: PathBuf,
-    parquet_writer: ArrowWriter<SharedBuffer>,
-    buffer: SharedBuffer,
+    parquet_writer: ArrowWriter<Vec<u8>>,
 }
 
 impl ParquetBuffer {
     pub fn new(path: &PathBuf, schema: SchemaRef, props: WriterProperties) -> Result<Self> {
-        let filename = timestamp_filename(&path, SystemTime::now())?;
+        let filename = timestamp_filename(path, SystemTime::now())?;
 
-        let buffer = SharedBuffer::new();
-
-        let writer = ArrowWriter::try_new(buffer.clone(), schema, Some(props))?;
+        let buffer = Vec::new();
+        let writer = ArrowWriter::try_new(buffer, schema, Some(props))?;
 
         Ok(Self {
             filename,
-            buffer,
             parquet_writer: writer,
         })
     }
@@ -92,8 +88,7 @@ impl ParquetBuffer {
     }
 
     fn finalize_and_write_file(self) -> Result<(PathBuf, Vec<u8>)> {
-        self.parquet_writer.close()?;
-        let bytes = self.buffer.try_downgrade()?;
+        let bytes = self.parquet_writer.into_inner()?;
 
         fs::write(&self.filename, &bytes)?;
         Ok((self.filename, bytes))

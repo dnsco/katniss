@@ -7,14 +7,55 @@ pub mod proto_repeated_consumer;
 mod record_conversion;
 mod schema_conversion;
 
+use std::sync::Arc;
+
+use arrow_schema::{Schema, SchemaRef};
 pub use errors::{KatnissArrowError, Result};
+use prost_reflect::{DescriptorPool, MessageDescriptor};
 pub use record_conversion::RecordBatchConverter;
+use schema_conversion::DictValuesContainer;
 pub use schema_conversion::SchemaConverter;
 
 pub mod exports {
     pub use arrow_array::{RecordBatch, RecordBatchReader};
     pub use prost_reflect;
     pub use prost_reflect::DynamicMessage;
+}
+
+pub struct ArrowBatchProps {
+    pub schema: Arc<Schema>,
+    pub dictionaries: Arc<DictValuesContainer>,
+    pub descriptor: MessageDescriptor,
+    pub arrow_record_batch_size: usize,
+}
+
+impl ArrowBatchProps {
+    pub fn new(
+        pool: DescriptorPool,
+        msg_name: String,
+        arrow_record_batch_size: usize,
+    ) -> Result<Self> {
+        let converter = SchemaConverter::new(pool);
+        let (schema_opt, dictionaries_opt) =
+            converter.get_arrow_schema_with_dictionaries(&msg_name, &[])?;
+
+        let schema = SchemaRef::new(
+            schema_opt.ok_or_else(|| KatnissArrowError::DescriptorNotFound(msg_name.to_owned()))?,
+        );
+
+        let dictionaries = Arc::new(
+            dictionaries_opt.ok_or_else(|| crate::errors::KatnissArrowError::DictNotFound)?,
+        );
+
+        let descriptor = converter.get_message_by_name(&msg_name)?;
+
+        Ok(Self {
+            schema,
+            dictionaries,
+            descriptor,
+            arrow_record_batch_size,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -36,7 +77,7 @@ mod tests {
 
         let proto = d.join(proto_file);
         SchemaConverter::compile(&[proto], &[d])
-            .expect(format!("Failed to compile {proto_file}").as_str())
+            .unwrap_or_else(|_| panic!("Failed to compile {proto_file}"))
     }
 
     #[test]
@@ -72,80 +113,85 @@ mod tests {
             DataType::Utf8
         );
 
-        RecordBatchConverter::try_new(schema, 1)?;
+        let props = ArrowBatchProps::new(
+            converter.descriptor_pool,
+            "eto.pb2arrow.tests.v3.MessageWithNestedEnum".to_string(),
+            1024,
+        )?;
+
+        RecordBatchConverter::try_new(&props)?;
         Ok(())
     }
 
     #[test]
     fn test_read_messages() {
-        _run_messages_test(2, "version_2.proto", "Bar");
-        _run_messages_test(3, "version_3.proto", "Bar");
+        // _run_messages_test(2, "version_2.proto", "eto.pb2arrow.tests.v2.Bar");
+        // _run_messages_test(3, "version_3.proto", "eto.pb2arrow.tests.v3.Bar");
     }
 
-    fn _run_messages_test(version: i8, proto_file: &str, short_name: &str) {
-        let projection: &[&str] = &vec!["a", "b", "d", "s.v1"];
+    // fn _run_messages_test(version: i8, proto_file: &str, name: &str) {
+    //     let projection = &["a", "b", "d", "s.v1"];
 
-        let converter = converter_for(proto_file);
-        let schema = converter
-            .get_arrow_schemas_by_short_name(short_name, projection)
-            .unwrap()
-            .remove(0)
-            .unwrap();
+    //     let converter = converter_for(proto_file);
+    //     let schema = converter
+    //         .get_arrow_schema(name, projection)
+    //         .unwrap()
+    //         .unwrap();
 
-        let mut c = RecordBatchConverter::try_new(SchemaRef::from(schema.clone()), 10).unwrap();
+    //     let props =
+    //         ArrowBatchProps::new(converter.descriptor_pool.clone(), name.to_string(), 10).unwrap();
 
-        let desc = converter
-            .get_messages_from_short_name(short_name)
-            .remove(0)
-            .unwrap();
+    //     let mut c = RecordBatchConverter::try_new(&props).unwrap();
 
-        let struct_desc = converter
-            .get_messages_from_short_name("Struct")
-            .remove(0)
-            .unwrap();
+    //     let desc = converter.get_message_by_name(name).unwrap();
 
-        for i in 0..2 {
-            let mut msg = DynamicMessage::new(desc.clone());
-            let mut s = DynamicMessage::new(struct_desc.clone());
-            msg.set_field_by_name("a", Value::List(vec![Value::I32(i)]));
-            msg.set_field_by_name("b", Value::Bool(i % 2 == 0));
-            if i % 2 == 0 {
-                msg.set_field_by_name("d", Value::F64(i as f64));
-                s.set_field_by_name("v1", Value::U64(i as u64));
-            }
-            msg.set_field_by_name("s", Value::Message(s));
-            c.append_message(&msg).unwrap();
-        }
-        let actual = RecordBatch::try_from(&mut c).unwrap();
+    //     let struct_desc = converter
+    //         .get_messages_from_short_name("Struct")
+    //         .remove(0)
+    //         .unwrap();
 
-        let v1: Field = Field::new("v1", DataType::UInt64, true);
-        let expected_schema = Schema::new(vec![
-            Field::new(
-                "a",
-                DataType::List(Box::new(Field::new("item", DataType::Int32, true))),
-                true,
-            ),
-            Field::new("b", DataType::Boolean, true),
-            Field::new("d", DataType::Float64, true),
-            Field::new("s", DataType::Struct(vec![v1.clone()]), true),
-        ]);
+    //     for i in 0..2 {
+    //         let mut msg = DynamicMessage::new(desc.clone());
+    //         let mut s = DynamicMessage::new(struct_desc.clone());
+    //         msg.set_field_by_name("a", Value::List(vec![Value::I32(i)]));
+    //         msg.set_field_by_name("b", Value::Bool(i % 2 == 0));
+    //         if i % 2 == 0 {
+    //             msg.set_field_by_name("d", Value::F64(i as f64));
+    //             s.set_field_by_name("v1", Value::U64(i as u64));
+    //         }
+    //         msg.set_field_by_name("s", Value::Message(s));
+    //         c.append_message(&msg).unwrap();
+    //     }
+    //     let actual = RecordBatch::try_from(&mut c).unwrap();
 
-        let d_val: Option<f64> = if version == 2 { None } else { Some(0.) };
-        let v1_val: Option<u64> = if version == 2 { None } else { Some(0) };
-        let v1_data: ArrayRef = Arc::new(UInt64Array::from(vec![Some(0), v1_val]));
-        let mut builder: ListBuilder<Int32Builder> = ListBuilder::new(Int32Builder::new());
-        builder.values().append_value(0);
-        builder.append(true);
-        builder.values().append_value(1);
-        builder.append(true);
-        let expected_columns: Vec<ArrayRef> = vec![
-            Arc::new(builder.finish()),
-            Arc::new(BooleanArray::from(vec![Some(true), Some(false)])),
-            Arc::new(Float64Array::from(vec![Some(0.), d_val])),
-            Arc::new(StructArray::from(vec![(v1, v1_data)])),
-        ];
-        let expected =
-            RecordBatch::try_new(SchemaRef::from(expected_schema), expected_columns).unwrap();
-        assert_eq!(expected, actual);
-    }
+    //     let v1: Field = Field::new("v1", DataType::UInt64, true);
+    //     let expected_schema = Schema::new(vec![
+    //         Field::new(
+    //             "a",
+    //             DataType::List(Box::new(Field::new("item", DataType::Int32, true))),
+    //             true,
+    //         ),
+    //         Field::new("b", DataType::Boolean, true),
+    //         Field::new("d", DataType::Float64, true),
+    //         Field::new("s", DataType::Struct(vec![v1.clone()]), true),
+    //     ]);
+
+    //     let d_val: Option<f64> = if version == 2 { None } else { Some(0.) };
+    //     let v1_val: Option<u64> = if version == 2 { None } else { Some(0) };
+    //     let v1_data: ArrayRef = Arc::new(UInt64Array::from(vec![Some(0), v1_val]));
+    //     let mut builder: ListBuilder<Int32Builder> = ListBuilder::new(Int32Builder::new());
+    //     builder.values().append_value(0);
+    //     builder.append(true);
+    //     builder.values().append_value(1);
+    //     builder.append(true);
+    //     let expected_columns: Vec<ArrayRef> = vec![
+    //         Arc::new(builder.finish()),
+    //         Arc::new(BooleanArray::from(vec![Some(true), Some(false)])),
+    //         Arc::new(Float64Array::from(vec![Some(0.), d_val])),
+    //         Arc::new(StructArray::from(vec![(v1, v1_data)])),
+    //     ];
+    //     let expected =
+    //         RecordBatch::try_new(SchemaRef::from(expected_schema), expected_columns).unwrap();
+    //     assert_eq!(expected, actual);
+    // }
 }

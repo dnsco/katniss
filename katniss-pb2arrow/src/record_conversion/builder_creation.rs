@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use arrow_array::builder::*;
 use arrow_array::types::Int32Type;
 use arrow_schema::{DataType, Field};
@@ -7,18 +9,12 @@ use crate::schema_conversion::DictValuesContainer;
 use crate::KatnissArrowError::{BatchConversionError, DictNotFound};
 
 pub struct BuilderFactory {
-    dictionaries: Option<DictValuesContainer>,
+    dictionaries: Arc<DictValuesContainer>,
 }
 
 impl BuilderFactory {
-    pub fn new() -> Self {
-        BuilderFactory { dictionaries: None }
-    }
-
-    pub fn new_with_dictionary(dictionaries: DictValuesContainer) -> Self {
-        BuilderFactory {
-            dictionaries: Some(dictionaries),
-        }
+    pub fn new_with_dictionary(dictionaries: Arc<DictValuesContainer>) -> Self {
+        BuilderFactory { dictionaries }
     }
 
     pub fn try_from_fields(&self, fields: Vec<Field>, capacity: usize) -> Result<StructBuilder> {
@@ -56,24 +52,20 @@ impl BuilderFactory {
             }
             DataType::Dictionary(_, _) => {
                 // Protobuf enums are int32 -> string
-                let dict_builder = match self.dictionaries.as_ref() {
-                    Some(d) => {
-                        let dict_values = inner_field
-                            .dict_id()
-                            .map(|dict_id| d.get_dict_values(dict_id))
-                            .flatten()
-                            .ok_or_else(|| DictNotFound)?;
-                        StringDictionaryBuilder::<Int32Type>::new_with_dictionary(
-                            capacity,
-                            dict_values,
-                        )
-                        .map_err(|err| BatchConversionError(err))?
-                    }
-                    None => StringDictionaryBuilder::<Int32Type>::with_capacity(
-                        capacity, capacity, capacity,
-                    ),
-                };
-                wrap_builder(dict_builder, kind)
+                let d = self.dictionaries.as_ref();
+
+                let dict_values = inner_field
+                    .dict_id()
+                    .map(|dict_id| d.get_dict_values(dict_id))
+                    .flatten()
+                    .ok_or_else(|| DictNotFound)?;
+                let builder = StringDictionaryBuilder::<Int32Type>::new_with_dictionary(
+                    capacity,
+                    dict_values,
+                )
+                .map_err(|err| BatchConversionError(err))?;
+
+                wrap_builder(builder, kind)
             }
             DataType::Struct(fields) => {
                 wrap_builder(self.try_from_fields(fields.clone(), capacity)?, kind)

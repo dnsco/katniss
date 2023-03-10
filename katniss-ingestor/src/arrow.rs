@@ -1,22 +1,28 @@
 use katniss_pb2arrow::{
     exports::{DynamicMessage, RecordBatch},
-    RecordBatchConverter,
+    ArrowBatchProps, RecordBatchConverter,
 };
 
 pub use crate::Result;
-pub struct ProtobufBatchIngestor {
+pub struct ProtobufIngestor {
     batch_size: usize,
     converter: RecordBatchConverter,
 }
 
-impl ProtobufBatchIngestor {
-    pub fn new(converter: RecordBatchConverter, batch_size: usize) -> Self {
-        Self {
+impl ProtobufIngestor {
+    pub fn new(props: ArrowBatchProps) -> Result<Self> {
+        let batch_size = props.arrow_record_batch_size;
+
+        let converter = RecordBatchConverter::try_new(&props)?;
+
+        Ok(Self {
             batch_size,
             converter,
-        }
+        })
     }
-    pub fn ingest(&mut self, msg: DynamicMessage) -> Result<Option<RecordBatch>> {
+
+    /// Ingests a single message, returns a Record Batch if batch size has been reached
+    pub fn ingest_message(&mut self, msg: DynamicMessage) -> Result<Option<RecordBatch>> {
         self.converter.append_message(&msg)?;
 
         if self.converter.len() >= self.batch_size {

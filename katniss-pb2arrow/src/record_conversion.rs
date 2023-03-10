@@ -3,7 +3,7 @@ use arrow_array::RecordBatch;
 use arrow_schema::{ArrowError, SchemaRef};
 use prost_reflect::DynamicMessage;
 
-use crate::schema_conversion::DictValuesContainer;
+use crate::ArrowBatchProps;
 use crate::KatnissArrowError;
 use crate::Result;
 
@@ -22,25 +22,12 @@ pub struct RecordBatchConverter {
 }
 
 impl RecordBatchConverter {
-    pub fn try_new(schema: SchemaRef, batch_size: usize) -> Result<Self> {
-        let factory = BuilderFactory::new();
-        let builder = factory.try_from_fields(schema.fields().clone(), batch_size)?;
+    pub fn try_new(props: &ArrowBatchProps) -> Result<Self> {
+        let batch_size = props.arrow_record_batch_size;
+        let factory = BuilderFactory::new_with_dictionary(props.dictionaries.clone());
+        let builder = factory.try_from_fields(props.schema.fields().clone(), batch_size)?;
         Ok(RecordBatchConverter {
-            schema,
-            batch_size,
-            builder,
-        })
-    }
-
-    pub fn try_new_with_dictionaries(
-        schema: SchemaRef,
-        batch_size: usize,
-        dictionaries: DictValuesContainer,
-    ) -> Result<Self> {
-        let factory = BuilderFactory::new_with_dictionary(dictionaries);
-        let builder = factory.try_from_fields(schema.fields().clone(), batch_size)?;
-        Ok(RecordBatchConverter {
-            schema,
+            schema: props.schema.clone(),
             batch_size,
             builder,
         })
@@ -60,8 +47,13 @@ impl RecordBatchConverter {
         self.builder.len()
     }
 
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn records(&mut self) -> Result<RecordBatch> {
-        RecordBatch::try_from(self).map_err(|e| KatnissArrowError::BatchConversionError(e))
+        RecordBatch::try_from(self).map_err(KatnissArrowError::BatchConversionError)
     }
 }
 

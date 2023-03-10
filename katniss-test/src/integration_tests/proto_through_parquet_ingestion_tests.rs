@@ -89,29 +89,3 @@ fn test_heterogenous_batch() -> Result<()> {
     write_batch(batch, "heterogenous_batch")?;
     Ok(())
 }
-
-#[test]
-fn test_short_common_shortname_returns_multiples() -> Result<()> {
-    let converter = schema_converter()?;
-
-    let protos = converter.get_messages_from_short_name("Bar");
-    assert_eq!(2, protos.len());
-    assert!(protos.iter().all(|a| a.is_some()));
-
-    let arrow = converter.get_arrow_schemas_by_short_name("Bar", &[])?;
-    assert_eq!(2, arrow.len());
-    assert!(arrow.iter().all(|a| a.is_some()));
-
-    // TODO: filtering by projection is weird
-    // let projected_arrow = converter.get_arrow_schemas_by_short_name("Bar", &["v3_only"])?;
-    // assert_eq!(2, projected_arrow.len());
-    // assert_eq!(
-    //     1,
-    //     projected_arrow
-    //         .into_iter()
-    //         .filter_map(std::convert::identity) //filter out nones
-    //         .count()
-    // );
-
-    Ok(())
-}
