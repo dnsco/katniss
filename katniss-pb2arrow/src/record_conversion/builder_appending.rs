@@ -1,5 +1,5 @@
 use arrow_array::builder::*;
-use arrow_array::types::{Int32Type, Utf8Type};
+use arrow_array::types::Int32Type;
 use arrow_schema::{DataType, Field};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 
@@ -64,12 +64,8 @@ fn append_non_list_value(
     // hack until https://github.com/apache/arrow-rs/issues/3837 is fixed
     let mut field_type = f.data_type().clone();
     if let Some(fd) = fd_option.as_ref() {
-        match fd.kind() {
-            prost_reflect::Kind::Enum(_) => {
-                field_type =
-                    DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8));
-            }
-            _ => {}
+        if let prost_reflect::Kind::Enum(_) = fd.kind() {
+            field_type = DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8));
         }
     }
 

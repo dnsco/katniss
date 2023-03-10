@@ -5,7 +5,7 @@ use katniss_pb2arrow::ArrowBatchProps;
 use lance::arrow::RecordBatchBuffer;
 use lance::dataset::{Dataset, WriteMode, WriteParams};
 
-use katniss_pb2arrow::exports::prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor};
+use katniss_pb2arrow::exports::prost_reflect::{DescriptorPool, DynamicMessage};
 use katniss_pb2arrow::exports::{RecordBatch, RecordBatchReader};
 use tokio::runtime::Runtime;
 
@@ -14,7 +14,6 @@ use crate::{arrow::ProtobufBatchIngestor, Result};
 use super::BatchIngestor;
 
 pub struct LanceFsIngestor {
-    descriptor: MessageDescriptor,
     ingestor: ProtobufBatchIngestor,
     rt: Arc<Runtime>,
     filename: String,
@@ -31,20 +30,20 @@ pub struct LanceFsIngestorProps<'a, P: AsRef<Path>> {
 
 impl LanceFsIngestor {
     pub fn new<P: AsRef<Path>>(props: &ArrowBatchProps, filename: P) -> Result<Self> {
-        let descriptor = props.descriptor.clone();
         let ingestor = ProtobufBatchIngestor::try_new(props)?;
-
         let filename = filename.as_ref().to_str().unwrap().to_string();
 
-        let mut params = lance::dataset::WriteParams::default();
-        params.max_rows_per_group = 1024 * 10;
-        params.mode = WriteMode::Create;
+        let params = lance::dataset::WriteParams {
+            max_rows_per_group: 1024 * 10,
+            mode: WriteMode::Create,
+            ..Default::default()
+        };
+
         let rt = Arc::new(Runtime::new()?);
 
         let batches: Vec<RecordBatch> = Vec::new();
 
         Ok(Self {
-            descriptor,
             ingestor,
             rt,
             filename,
@@ -53,7 +52,7 @@ impl LanceFsIngestor {
         })
     }
 
-    fn write(&self, batch: RecordBatch) -> Result<()> {
+    pub fn write(&self, batch: RecordBatch) -> Result<()> {
         let mut reader: Box<dyn RecordBatchReader> = Box::new(RecordBatchBuffer::new(vec![batch]));
         self.rt
             .block_on(async {

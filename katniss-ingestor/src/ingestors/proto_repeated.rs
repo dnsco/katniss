@@ -9,10 +9,7 @@ use katniss_pb2arrow::{
     ArrowBatchProps, Result as ProtoResult,
 };
 
-use super::{
-    lance_fs_ingestor::LanceFsIngestor, parquet_fs::ParquetFileIngestor, stub_lance::StubLance,
-    BatchIngestor,
-};
+use super::{lance_fs_ingestor::LanceFsIngestor, parquet_fs::ParquetFileIngestor, BatchIngestor};
 
 pub struct RepeatedProtoIngestor<B: Buf> {
     bytes: B,

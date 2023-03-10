@@ -8,7 +8,6 @@ use crate::{
             SimpleOneOfMessage, SomeRandomEnum, UnitContainer,
         },
     },
-    schema_converter,
     test_util::*,
 };
 
