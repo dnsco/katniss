@@ -11,7 +11,6 @@ use crate::{
     },
     schema_converter,
 };
-use test_util::*;
 
 #[test] #[ignore]
 fn test_parse_dict_field_values() -> Result<()> {

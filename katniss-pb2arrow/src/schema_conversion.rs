@@ -9,11 +9,11 @@ use std::path::Path;
 use std::process::Command;
 
 use arrow_schema::DataType::Utf8;
-use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use arrow_schema::{DataType, Field, Schema};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
 
-use crate::{KatnissArrowError, RecordBatchConverter, Result};
+use crate::{KatnissArrowError, Result};
 
 /// Holds dictionary values for fields. Not threadsafe
 #[derive(Debug, Clone)]

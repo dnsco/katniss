@@ -21,10 +21,9 @@ fn test_log_to_lance() -> Result<()> {
 
     let ingestor = RepeatedProtoIngestor::new(
         bytes,
-        ArrowBatchProps::new(
+        &ArrowBatchProps::new(
             descriptor_pool()?,
             "eto.pb2arrow.tests.spacecorp.Packet".to_owned(),
-            1024,
         )?,
         Serialization::Lance {
             filename: "test_out.lance",
