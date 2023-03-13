@@ -12,3 +12,7 @@ prost-reflect = "0.10.2"
 tempfile = "3.4.0"
 thiserror = "1.0.39"
 which = "4.4.0"
+
+[dev-dependencies]
+anyhow = "1.0.69"
+katniss-test = { path = "../katniss-test" }

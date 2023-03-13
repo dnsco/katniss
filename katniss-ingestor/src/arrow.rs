@@ -3,7 +3,7 @@ use katniss_pb2arrow::{
     ArrowBatchProps, RecordConverter,
 };
 
-pub use crate::Result;
+use crate::Result;
 
 /// Ingests individual Protobuf Messages, and returns a batch if batch_size threshhold is crossed.
 pub struct ProtobufBatchIngestor {
