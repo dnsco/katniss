@@ -8,14 +8,14 @@ use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 use super::{TemporalBuffer, TemporalBytes};
 use crate::Result;
 
-pub struct ParquetConsumer {
+pub struct ParquetConverter {
     rx: Receiver<TemporalBuffer>,
     tx: Sender<TemporalBytes>,
     schema: SchemaRef,
     parquet_props: WriterProperties,
 }
 
-impl ParquetConsumer {
+impl ParquetConverter {
     pub fn new(rx: Receiver<TemporalBuffer>, schema: SchemaRef) -> (Self, Receiver<TemporalBytes>) {
         let (tx, rx_bytes) = channel();
 
@@ -80,7 +80,7 @@ mod tests {
             .get_arrow_schema("eto.pb2arrow.tests.spacecorp.Packet", &[])?
             .unwrap();
 
-        let (mut consumer, rx_bytes) = ParquetConsumer::new(rx, Arc::new(schema));
+        let (mut consumer, rx_bytes) = ParquetConverter::new(rx, Arc::new(schema));
         tx_buffer.send(TemporalBuffer::new(Utc::now()))?;
         assert!(rx_bytes.try_recv().is_err());
 

@@ -6,6 +6,9 @@ use chrono::{DateTime, Utc};
 use crate::{arrow::ProtobufBatchIngestor, Result};
 use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
 
+type ChanIn = Receiver<DynamicMessage>;
+type ChanOut = Sender<TemporalBuffer>;
+type ChanNext = Receiver<TemporalBuffer>;
 /// Rotates the in-memory buffer it is written to per a timescale,
 /// Currently hardcoded to rotate every 60 seconds
 /// we should probably do some more timelord stuff to have buffers line up with minutes
@@ -13,26 +16,34 @@ use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
 pub struct TemporalRotator {
     pub converter: ProtobufBatchIngestor,
     pub current: TemporalBuffer,
-    pub tx: Sender<TemporalBuffer>,
+    pub rx: ChanIn,
+    pub tx: ChanOut,
 }
 
 impl TemporalRotator {
     pub fn try_new(
+        rx_in: ChanIn,
         props: &ArrowBatchProps,
         now: DateTime<Utc>,
-    ) -> Result<(Self, Receiver<TemporalBuffer>)> {
-        let (tx, rx) = channel();
+    ) -> Result<(Self, ChanNext)> {
+        let (tx_out, rx_next) = channel();
         Ok((
             Self {
                 converter: ProtobufBatchIngestor::try_new(props)?,
                 current: TemporalBuffer::new(now),
-                tx,
+                rx: rx_in,
+                tx: tx_out,
             },
-            rx,
+            rx_next,
         ))
     }
 
-    pub fn ingest(&mut self, msg: DynamicMessage, now: DateTime<Utc>) -> Result<()> {
+    pub fn process_next(&mut self) -> Result<()> {
+        let msg = self.rx.recv()?;
+        self.ingest(msg, Utc::now())
+    }
+
+    fn ingest(&mut self, msg: DynamicMessage, now: DateTime<Utc>) -> Result<()> {
         if now > self.current.end_at {
             let batch = self.converter.finish()?;
             self.current.batches.push(batch);
@@ -62,8 +73,10 @@ mod tests {
     #[test]
     fn it_rotates_on_a_time_period() -> anyhow::Result<()> {
         let start = Utc::now();
+        let (_tx, rx_in) = channel();
         let (mut rotator, rx) = TemporalRotator::try_new(
-            &ArrowBatchProps::new(descriptor_pool()?, PACKET.to_owned())?
+            rx_in,
+            &ArrowBatchProps::try_new(descriptor_pool()?, PACKET.to_owned())?
                 .with_records_per_arrow_batch(2),
             start,
         )?;

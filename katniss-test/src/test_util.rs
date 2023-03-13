@@ -21,7 +21,7 @@ impl<'a, T: Message> ProtoBatch<'a, T> {
         let messages = self.messages();
         let msg_name = &self.msg_name();
 
-        let props = ArrowBatchProps::new(descriptor_pool()?, msg_name.to_owned())?
+        let props = ArrowBatchProps::try_new(descriptor_pool()?, msg_name.to_owned())?
             .with_records_per_arrow_batch(messages.len());
 
         let mut converter = RecordConverter::try_new(&props)?;
