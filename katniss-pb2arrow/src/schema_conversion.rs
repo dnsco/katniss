@@ -279,7 +279,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Hey @chang why was this one ignored?"]
+    #[ignore = "per channg = workaround - arrow just adds duplicates to
+    dictionary values if you concatenation dictionary arrays. So temporarily we
+    just turn enum fields in protos into string columns in arrow. We’re working
+    on deduplication in arrow right now. Once that’s done we can turn it
+    back to dictionary fields"]
     fn test_parse_dict_field_values() -> Result<()> {
         let converter = schema_converter()?;
 
