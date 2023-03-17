@@ -61,15 +61,7 @@ fn append_non_list_value(
         cow.as_deref()
     };
 
-    // hack until https://github.com/apache/arrow-rs/issues/3837 is fixed
-    let mut field_type = f.data_type().clone();
-    if let Some(fd) = fd_option.as_ref() {
-        if let prost_reflect::Kind::Enum(_) = fd.kind() {
-            field_type = DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8));
-        }
-    }
-
-    match field_type {
+    match f.data_type() {
         DataType::Float64 => extend_builder(
             field_builder::<Float64Builder>(struct_builder, i),
             parse_val(val, Value::as_f64)?,
@@ -120,9 +112,7 @@ fn append_non_list_value(
             },
         ),
         DataType::Dictionary(_, _) => {
-            // hack until https://github.com/apache/arrow-rs/issues/3837 is fixed
-            // let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
-            let f = field_builder::<StringBuilder>(struct_builder, i);
+            let f = field_builder::<StringDictionaryBuilder<Int32Type>>(struct_builder, i);
 
             let intval = val.and_then(|v| v.as_enum_number());
             match intval {
@@ -137,9 +127,6 @@ fn append_non_list_value(
                         .ok_or_else(|| KatnissArrowError::NoEnumValue(intval))?;
 
                     f.append_value(enum_value.name());
-
-                    // f.append(enum_value.name())
-                    //     .map_err(KatnissArrowError::InvalidEnumValue)?;
                 }
                 None => f.append_null(),
             };
