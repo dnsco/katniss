@@ -8,7 +8,6 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::Command;
 
-use arrow_schema::DataType::Utf8;
 use arrow_schema::{DataType, Field, Schema};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
@@ -79,7 +78,7 @@ impl FieldConverter {
             let item = Box::new(Field::new("item", data_type, true));
             Field::new(name, DataType::List(item), true)
         } else if matches!(data_type, DataType::Dictionary(_, _)) {
-            /*            let enum_values = f
+            let enum_values = f
                            .kind()
                            .as_enum()
                            .unwrap()
@@ -89,9 +88,6 @@ impl FieldConverter {
                        let is_ordered = enum_values.windows(2).all(|w| w[0] <= w[1]);
                        let dict_id = self.dictionaries.add_dictionary(enum_values);
                        Field::new_dict(name, data_type, true, dict_id, is_ordered)
-            */
-            // hack until https://github.com/apache/arrow-rs/issues/3837 is resolved
-            Field::new(name, Utf8, true)
         } else {
             Field::new(name, data_type, true)
         }
@@ -252,8 +248,6 @@ fn project_fields(prefix: &str, fields: &Vec<Field>, projection: &HashSet<&str>)
     keep
 }
 
-//         let values = f.kind().as_enum().unwrap().values().map(|v| v.name().to_string()).collect::<Vec<_>>();
-
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
@@ -279,11 +273,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "per channg = workaround - arrow just adds duplicates to
-    dictionary values if you concatenation dictionary arrays. So temporarily we
-    just turn enum fields in protos into string columns in arrow. We’re working
-    on deduplication in arrow right now. Once that’s done we can turn it
-    back to dictionary fields"]
     fn test_parse_dict_field_values() -> Result<()> {
         let converter = schema_converter()?;
 
