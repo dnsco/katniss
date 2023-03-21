@@ -2,6 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 
 use katniss_pb2arrow::exports::RecordBatch;
 
+#[derive(Debug)]
 pub struct TemporalBuffer {
     pub begin_at: DateTime<Utc>,
     pub end_at: DateTime<Utc>,
@@ -19,6 +20,7 @@ impl TemporalBuffer {
     }
 }
 
+#[derive(Debug)]
 pub struct TemporalBytes {
     pub begin_at: DateTime<Utc>,
     pub end_at: DateTime<Utc>,

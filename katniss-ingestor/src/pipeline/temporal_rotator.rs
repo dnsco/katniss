@@ -1,14 +1,18 @@
 use super::TemporalBuffer;
-use std::sync::mpsc::{channel, Receiver, Sender};
 
 use chrono::{DateTime, Utc};
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    task::block_in_place,
+};
 
-use crate::{arrow::ProtobufBatchIngestor, Result};
+use crate::{arrow::ProtobufBatchIngestor, errors::KatinssIngestorError, Result};
 use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
 
-type ChanIn = Receiver<DynamicMessage>;
-type ChanOut = Sender<TemporalBuffer>;
-type ChanNext = Receiver<TemporalBuffer>;
+type ChanIn = UnboundedReceiver<DynamicMessage>;
+type ChanOut = UnboundedSender<TemporalBuffer>;
+type ChanNext = UnboundedReceiver<TemporalBuffer>;
+
 /// Rotates the in-memory buffer it is written to per a timescale,
 /// Currently hardcoded to rotate every 60 seconds
 /// we should probably do some more timelord stuff to have buffers line up with minutes
@@ -26,7 +30,7 @@ impl TemporalRotator {
         props: &ArrowBatchProps,
         now: DateTime<Utc>,
     ) -> Result<(Self, ChanNext)> {
-        let (tx_out, rx_next) = channel();
+        let (tx_out, rx_next) = unbounded_channel();
         Ok((
             Self {
                 converter: ProtobufBatchIngestor::try_new(props)?,
@@ -38,18 +42,28 @@ impl TemporalRotator {
         ))
     }
 
-    pub fn process_next(&mut self) -> Result<()> {
-        let msg = self.rx.recv()?;
-        self.ingest(msg, Utc::now())
+    pub async fn process_next(&mut self) -> Result<()> {
+        let msg = self
+            .rx
+            .recv()
+            .await
+            .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
+        block_in_place(|| self.ingest_potentially_blocking(msg, Utc::now()))
     }
 
-    fn ingest(&mut self, msg: DynamicMessage, now: DateTime<Utc>) -> Result<()> {
+    fn ingest_potentially_blocking(
+        &mut self,
+        msg: DynamicMessage,
+        now: DateTime<Utc>,
+    ) -> Result<()> {
         if now > self.current.end_at {
             let batch = self.converter.finish()?;
             self.current.batches.push(batch);
 
             let old = std::mem::replace(&mut self.current, TemporalBuffer::new(now));
-            self.tx.send(old)?;
+            self.tx
+                .send(old)
+                .map_err(|_| KatinssIngestorError::PipelineClosed)?;
         }
 
         if let Some(batch) = self.converter.ingest_message(msg)? {
@@ -73,31 +87,31 @@ mod tests {
     #[test]
     fn it_rotates_on_a_time_period() -> anyhow::Result<()> {
         let start = Utc::now();
-        let (_tx, rx_in) = channel();
-        let (mut rotator, rx) = TemporalRotator::try_new(
+        let (_tx, rx_in) = unbounded_channel();
+        let (mut rotator, mut rx) = TemporalRotator::try_new(
             rx_in,
             &ArrowBatchProps::try_new(descriptor_pool()?, PACKET.to_owned())?
                 .with_records_per_arrow_batch(2),
             start,
         )?;
 
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(1),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(2),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(5),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(10),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(20),
         )?;
@@ -107,7 +121,7 @@ mod tests {
         assert!(rx.try_recv().is_err());
 
         // ingesting a packet more than 60 seconds in future rotates buffers
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(61),
         )?;

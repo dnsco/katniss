@@ -31,4 +31,7 @@ pub enum KatinssIngestorError {
 
     #[error("Parquet Pipeline Clog: {0}")]
     ParquetBufferSend(#[from] SendError<TemporalBytes>),
+
+    #[error("Pipeline Channel Closed")]
+    PipelineClosed,
 }
