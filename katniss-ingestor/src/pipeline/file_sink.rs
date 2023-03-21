@@ -47,7 +47,7 @@ mod tests {
 
     use super::FileSink;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_name() -> anyhow::Result<()> {
         let (tx, rx) = unbounded_channel();
         let temp_dir = tempdir()?;

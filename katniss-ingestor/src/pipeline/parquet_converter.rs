@@ -1,6 +1,9 @@
 use arrow_schema::SchemaRef;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    task::block_in_place,
+};
 
 use super::{TemporalBuffer, TemporalBytes};
 use crate::{errors::KatinssIngestorError, Result};
@@ -45,17 +48,20 @@ impl ParquetConverter {
             .recv()
             .await
             .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
+
         let mut writer = ArrowWriter::try_new(
             Vec::<u8>::new(), // this could probably be a with_capacity with *some* number
             self.schema.clone(),
             Some(self.parquet_props.clone()),
         )?;
 
-        for batch in buf.batches {
-            writer.write(&batch)?;
-        }
+        let bytes = block_in_place(|| {
+            for batch in buf.batches {
+                writer.write(&batch)?;
+            }
 
-        let bytes = writer.into_inner()?;
+            writer.into_inner()
+        })?;
 
         self.tx
             .send(TemporalBytes {
@@ -80,7 +86,7 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn it_consumes_temporal_buffers_into_parquet_bytes() -> anyhow::Result<()> {
         let (tx_buffer, rx) = unbounded_channel();
         let schema = schema_converter()?

@@ -1,7 +1,10 @@
 use super::TemporalBuffer;
 
 use chrono::{DateTime, Utc};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    task::block_in_place,
+};
 
 use crate::{arrow::ProtobufBatchIngestor, errors::KatinssIngestorError, Result};
 use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
@@ -45,10 +48,14 @@ impl TemporalRotator {
             .recv()
             .await
             .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
-        self.ingest(msg, Utc::now())
+        block_in_place(|| self.ingest_potentially_blocking(msg, Utc::now()))
     }
 
-    fn ingest(&mut self, msg: DynamicMessage, now: DateTime<Utc>) -> Result<()> {
+    fn ingest_potentially_blocking(
+        &mut self,
+        msg: DynamicMessage,
+        now: DateTime<Utc>,
+    ) -> Result<()> {
         if now > self.current.end_at {
             let batch = self.converter.finish()?;
             self.current.batches.push(batch);
@@ -88,23 +95,23 @@ mod tests {
             start,
         )?;
 
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(1),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(2),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(5),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(10),
         )?;
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(20),
         )?;
@@ -114,7 +121,7 @@ mod tests {
         assert!(rx.try_recv().is_err());
 
         // ingesting a packet more than 60 seconds in future rotates buffers
-        rotator.ingest(
+        rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
             start + Duration::seconds(61),
         )?;
