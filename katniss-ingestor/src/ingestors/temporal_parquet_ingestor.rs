@@ -1,12 +1,11 @@
-use std::{
-    convert::Infallible,
-    path::Path,
-    sync::mpsc::{channel, Sender},
-    thread::{self, JoinHandle},
-};
+use std::{convert::Infallible, path::Path, thread::JoinHandle};
 
 use chrono::Utc;
 use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedSender},
+    task::JoinSet,
+};
 
 use crate::{
     pipeline::{FileSink, ParquetConverter, TemporalRotator},
@@ -29,32 +28,32 @@ pub type LoopHandle = JoinHandle<Result<Infallible>>;
 /// Returns:
 /// - a channel that functions as the head of the pipeline
 /// - an array of handles to each thread
-pub fn threaded_pipeline<P: AsRef<Path>>(
+pub async fn threaded_pipeline<P: AsRef<Path>>(
     props: ArrowBatchProps,
     directory: P,
-) -> Result<(Sender<DynamicMessage>, [LoopHandle; 3])> {
-    let (head, rx_msg) = channel();
+) -> Result<(UnboundedSender<DynamicMessage>, JoinSet<Result<Infallible>>)> {
+    let (head, rx_msg) = unbounded_channel();
     let (mut rotator, rx_buf) = TemporalRotator::try_new(rx_msg, &props, Utc::now())?;
     let (mut converter, rx_bytes) = ParquetConverter::new(rx_buf, props.schema);
-    let sink = FileSink::new(rx_bytes, directory.as_ref());
+    let mut sink = FileSink::new(rx_bytes, directory.as_ref());
 
-    let rotator_handle = thread::spawn(move || -> Result<Infallible> {
+    let mut tasks = JoinSet::new();
+    tasks.spawn(async move {
         loop {
-            rotator.process_next()?;
+            rotator.process_next().await?
+        }
+    });
+    tasks.spawn(async move {
+        loop {
+            converter.process_next_buffer().await?;
         }
     });
 
-    let converter_handle = thread::spawn(move || -> Result<Infallible> {
+    tasks.spawn(async move {
         loop {
-            converter.process_next_buffer()?;
+            sink.sink_next().await?;
         }
     });
 
-    let sink_handle = thread::spawn(move || -> Result<Infallible> {
-        loop {
-            sink.sink_next()?;
-        }
-    });
-
-    Ok((head, [rotator_handle, converter_handle, sink_handle]))
+    Ok((head, tasks))
 }
