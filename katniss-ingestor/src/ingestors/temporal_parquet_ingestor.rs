@@ -13,20 +13,13 @@ use crate::{
 };
 
 /// Start a pipeline that ingests dynamic messages to parquet filesystem
-/// Spins up three threads:
-/// - One for ArrowEncoding
-/// - One for ParquetEncoding
-/// - One for Disk access
-///
-/// We're using threads because encoding will do a bunch of CPU work at
-/// unpredictable times, so I didn't want to block an async executor.
-/// If the cost of spinning up three threads and letting the OS schedule it
-/// winds up being grateater than the coding work, this can be changed.
-///
 /// Returns:
-/// - a channel that functions as the head of the pipeline
-/// - an array of handles to each thread
-pub async fn threaded_pipeline<P: AsRef<Path>>(
+/// * a channel that functions as the head of the pipeline
+/// * A JoinSet of infinte loops (Infallible used in place of !) for
+///     - ArrowEncoding
+///     - ParquetEncoding
+///     - Disk access
+pub async fn parquet_fs_pipeline<P: AsRef<Path>>(
     props: ArrowBatchProps,
     directory: P,
 ) -> Result<(UnboundedSender<DynamicMessage>, JoinSet<Result<Infallible>>)> {
@@ -46,7 +39,6 @@ pub async fn threaded_pipeline<P: AsRef<Path>>(
             converter.process_next_buffer().await?;
         }
     });
-
     tasks.spawn(async move {
         loop {
             sink.sink_next().await?;
