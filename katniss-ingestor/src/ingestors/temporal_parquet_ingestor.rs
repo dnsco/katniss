@@ -1,4 +1,4 @@
-use std::{convert::Infallible, path::Path, thread::JoinHandle};
+use std::{convert::Infallible, path::Path};
 
 use chrono::Utc;
 use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
@@ -11,8 +11,6 @@ use crate::{
     pipeline::{FileSink, ParquetConverter, TemporalRotator},
     Result,
 };
-
-pub type LoopHandle = JoinHandle<Result<Infallible>>;
 
 /// Start a pipeline that ingests dynamic messages to parquet filesystem
 /// Spins up three threads:
