@@ -6,13 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow-array = "33.0.0"
-arrow-schema = "33.0.0"
-prost-reflect = "0.10.2"
-tempfile = "3.4.0"
-thiserror = "1.0.39"
-which = "4.4.0"
+arrow-array.workspace = true
+arrow-schema.workspace = true
+prost-reflect.workspace = true
+thiserror.workspace = true
+tempfile.workspace = true
+which.workspace = true
 
 [dev-dependencies]
-anyhow = "1.0.69"
+anyhow.workspace = true
 katniss-test = { path = "../katniss-test" }

@@ -2,3 +2,27 @@
 [workspace]
 
 members = ["katniss", "katniss-ingestor", "katniss-pb2arrow", "katniss-test"]
+
+[workspace.dependencies]
+lance = { git = "https://github.com/eto-ai/lance.git", branch = "main" }
+
+anyhow = "1.0.70"
+arrow-array = "33.0.0"
+arrow-schema = "33.0.0"
+chrono = "0.4.23"
+clap = { version = "4.1.6", features = ["deprecated", "derive", "env"] }
+itertools = "0.10.5"
+object_store = "0.5.5"
+parquet = "33.0.0"
+prost = "0.11.8"
+prost-reflect = "0.10.2"
+tempfile = "3.4.0"
+tokio = { version = "1.0", default-features = false, features = [
+    "macros",
+    "rt",
+    "rt-multi-thread",
+] }
+thiserror = "1.0.39"
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["tracing-log"] }
+which = "4.4.0"
