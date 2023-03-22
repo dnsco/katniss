@@ -34,4 +34,7 @@ pub enum KatinssIngestorError {
 
     #[error("Pipeline Channel Closed")]
     PipelineClosed,
+
+    #[error("Object Store Error: {0}")]
+    ObjectStoreError(#[from] object_store::Error),
 }
