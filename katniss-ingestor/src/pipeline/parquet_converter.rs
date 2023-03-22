@@ -67,7 +67,7 @@ impl ParquetConverter {
             .send(TemporalBytes {
                 begin_at: buf.begin_at,
                 end_at: buf.end_at,
-                bytes,
+                bytes: bytes.into(),
             })
             .map_err(|_| KatinssIngestorError::PipelineClosed)?;
 
@@ -80,7 +80,6 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::Utc;
-    use katniss_pb2arrow::exports::prost_reflect::bytes::Bytes;
     use katniss_test::schema_converter;
     use parquet::file::{reader::FileReader, serialized_reader::SerializedFileReader};
 
@@ -101,7 +100,7 @@ mod tests {
 
         let bytes = rx_bytes.try_recv()?;
 
-        let reader = SerializedFileReader::new(Bytes::from(bytes.bytes))?;
+        let reader = SerializedFileReader::new(bytes.bytes)?;
         //TODO– give initial buffer a batch to see a row group happen
         assert_eq!(0, reader.metadata().num_row_groups());
         Ok(())
