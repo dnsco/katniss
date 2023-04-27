@@ -1,7 +1,7 @@
-use std::{convert::Infallible, path::Path};
+use std::convert::Infallible;
 
 use chrono::Utc;
-use object_store::local::LocalFileSystem;
+use object_store::ObjectStore;
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
     task::JoinSet,
@@ -23,15 +23,14 @@ pub type LoopJoinset = JoinSet<Result<Infallible>>; // (Infallible used in place
 ///     - ArrowEncoding
 ///     - ParquetEncoding
 ///     - Disk access
-pub async fn parquet_fs_pipeline<P: AsRef<Path>>(
+pub async fn parquet_object_store_pipeline(
     props: ArrowBatchProps,
-    directory: P,
+    object_store: Box<dyn ObjectStore>,
 ) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinset)> {
     let (head, rx_msg) = unbounded_channel();
     let (mut rotator, rx_buf) = TemporalRotator::try_new(rx_msg, &props, Utc::now())?;
     let (mut converter, rx_bytes) = ParquetConverter::new(rx_buf, props.schema);
-    let store = LocalFileSystem::new_with_prefix(directory.as_ref())?;
-    let mut sink = StoreSink::new(rx_bytes, Box::new(store));
+    let mut sink = StoreSink::new(rx_bytes, object_store);
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
