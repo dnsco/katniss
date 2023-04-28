@@ -1,13 +1,13 @@
 [package]
 name = "katniss"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-katniss-pb2arrow = { path = "../katniss-pb2arrow" }
-katniss-ingestor = { path = "../katniss-ingestor" }
+katniss-pb2arrow = { version = "0.0.1", path = "../katniss-pb2arrow" }
+katniss-ingestor = { version = "0.0.1", path = "../katniss-ingestor" }
 
 # re-exports
 arrow-array.workspace = true
