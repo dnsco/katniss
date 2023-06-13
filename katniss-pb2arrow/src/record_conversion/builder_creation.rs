@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arrow_array::builder::*;
 use arrow_array::types::Int32Type;
-use arrow_schema::{DataType, Field};
+use arrow_schema::{DataType, Field, Fields};
 
 use crate::errors::Result;
 use crate::schema_conversion::DictValuesContainer;
@@ -17,7 +17,7 @@ impl BuilderFactory {
         BuilderFactory { dictionaries }
     }
 
-    pub fn try_from_fields(&self, fields: Vec<Field>, capacity: usize) -> Result<StructBuilder> {
+    pub fn try_from_fields(&self, fields: Fields, capacity: usize) -> Result<StructBuilder> {
         let field_builders: Vec<Box<dyn ArrayBuilder>> = fields
             .iter()
             .map(|f| self.make_builder(f, capacity))

@@ -1,12 +1,12 @@
 use arrow_array::builder::*;
 use arrow_array::types::Int32Type;
-use arrow_schema::{DataType, Field};
+use arrow_schema::{DataType, Field, Fields};
 use prost_reflect::{DynamicMessage, ReflectMessage, Value};
 
 use crate::{KatnissArrowError, Result};
 
 pub fn append_all_fields(
-    fields: &[Field],
+    fields: &Fields,
     builder: &mut StructBuilder,
     msg: Option<&DynamicMessage>,
 ) -> Result<()> {
@@ -135,9 +135,9 @@ fn append_non_list_value(
         DataType::Struct(nested_fields) => {
             let b = field_builder::<StructBuilder>(struct_builder, i);
             match val {
-                Some(v) => append_all_fields(&nested_fields[..], b, v.as_message())?,
+                Some(v) => append_all_fields(nested_fields, b, v.as_message())?,
                 None => {
-                    append_all_fields(&nested_fields[..], b, None)?;
+                    append_all_fields(nested_fields, b, None)?;
                 }
             };
             Ok(())

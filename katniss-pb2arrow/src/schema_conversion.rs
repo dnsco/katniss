@@ -7,8 +7,9 @@ use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::Command;
+use std::sync::Arc;
 
-use arrow_schema::{DataType, Field, Schema};
+use arrow_schema::{DataType, Field, Fields, Schema};
 use prost_reflect::{DescriptorPool, FieldDescriptor, MessageDescriptor};
 use tempfile::NamedTempFile;
 
@@ -75,19 +76,19 @@ impl FieldConverter {
         // However I think higher level query engines tend to not deal well with UnionTypes so
         // we should just keep the "striped" layout for now
         if f.is_list() {
-            let item = Box::new(Field::new("item", data_type, true));
+            let item = Arc::new(Field::new("item", data_type, true));
             Field::new(name, DataType::List(item), true)
         } else if matches!(data_type, DataType::Dictionary(_, _)) {
             let enum_values = f
-                           .kind()
-                           .as_enum()
-                           .unwrap()
-                           .values()
-                           .map(|v| v.name().to_string())
-                           .collect::<Vec<_>>();
-                       let is_ordered = enum_values.windows(2).all(|w| w[0] <= w[1]);
-                       let dict_id = self.dictionaries.add_dictionary(enum_values);
-                       Field::new_dict(name, data_type, true, dict_id, is_ordered)
+                .kind()
+                .as_enum()
+                .unwrap()
+                .values()
+                .map(|v| v.name().to_string())
+                .collect::<Vec<_>>();
+            let is_ordered = enum_values.windows(2).all(|w| w[0] <= w[1]);
+            let dict_id = self.dictionaries.add_dictionary(enum_values);
+            Field::new_dict(name, data_type, true, dict_id, is_ordered)
         } else {
             Field::new(name, data_type, true)
         }
@@ -189,7 +190,7 @@ impl SchemaConverter {
         let schema = Schema::new(
             msg.fields()
                 .map(|f| field_converter.to_arrow_mut(&f))
-                .collect(),
+                .collect::<Vec<_>>(),
         );
         self.dictionary_map
             .borrow_mut()
@@ -200,7 +201,7 @@ impl SchemaConverter {
         } else {
             let prefix = "".to_string();
             let proj_set: HashSet<&str> = HashSet::from_iter(projection.to_vec());
-            let keep: Vec<Field> = project_fields(&prefix, schema.fields(), &proj_set);
+            let keep = project_fields(&prefix, schema.fields(), &proj_set);
             Ok(Some(Schema::new(keep)))
         }
     }
@@ -222,8 +223,8 @@ impl SchemaConverter {
     }
 }
 
-fn project_fields(prefix: &str, fields: &Vec<Field>, projection: &HashSet<&str>) -> Vec<Field> {
-    let mut keep: Vec<Field> = Vec::new();
+fn project_fields(prefix: &str, fields: &Fields, projection: &HashSet<&str>) -> Vec<Arc<Field>> {
+    let mut keep = Vec::new();
     for f in fields {
         // make qualified name
         let qualified = format!("{}.{}", prefix, f.name());
@@ -237,11 +238,11 @@ fn project_fields(prefix: &str, fields: &Vec<Field>, projection: &HashSet<&str>)
         } else if let DataType::Struct(subfields) = f.data_type() {
             let subkeep = project_fields(name, subfields, projection);
             if !subkeep.is_empty() {
-                keep.push(Field::new(
+                keep.push(Arc::new(Field::new(
                     f.name(),
-                    DataType::Struct(subkeep),
+                    DataType::Struct(subkeep.into()),
                     f.is_nullable(),
-                ));
+                )));
             }
         }
     }

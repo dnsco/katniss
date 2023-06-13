@@ -23,7 +23,7 @@ impl RecordConverter {
     pub fn try_new(props: &ArrowBatchProps) -> Result<Self> {
         let batch_size = props.records_per_arrow_batch;
         let factory = BuilderFactory::new_with_dictionary(props.dictionaries.clone());
-        let builder = factory.try_from_fields(props.schema.fields().clone(), batch_size)?;
+        let builder = factory.try_from_fields(props.schema.fields().to_owned(), batch_size)?;
         Ok(Self {
             schema: props.schema.clone(),
             builder,
