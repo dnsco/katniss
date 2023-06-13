@@ -1,6 +1,6 @@
 [package]
 name = "katniss-ingestor"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 license = "Apache-2.0"
 description = "WIP"
@@ -17,7 +17,7 @@ parquet.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
-katniss-pb2arrow = { version = "0.0.1", path = "../katniss-pb2arrow" }
+katniss-pb2arrow = { version = "0.0.2", path = "../katniss-pb2arrow" }
 
 [dev-dependencies]
 anyhow.workspace = true
