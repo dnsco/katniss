@@ -2,7 +2,6 @@ use katniss_pb2arrow::exports::DynamicMessage;
 
 use crate::Result;
 
-pub mod lance_fs_ingestor;
 pub mod parquet_buffered;
 pub mod parquet_fs;
 pub mod proto_repeated;
