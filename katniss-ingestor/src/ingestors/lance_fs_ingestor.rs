@@ -11,8 +11,6 @@ use tokio::runtime::Runtime;
 
 use crate::{arrow::ProtobufBatchIngestor, Result};
 
-use super::BatchIngestor;
-
 pub struct LanceFsIngestor {
     ingestor: ProtobufBatchIngestor,
     rt: Arc<Runtime>,
@@ -61,9 +59,7 @@ impl LanceFsIngestor {
             .unwrap(); //FIX unwrap
         Ok(())
     }
-}
 
-impl BatchIngestor for LanceFsIngestor {
     fn ingest(&mut self, packets: Vec<DynamicMessage>) -> Result<()> {
         for packet in packets {
             if let Some(batch) = self.ingestor.ingest_message(packet)? {

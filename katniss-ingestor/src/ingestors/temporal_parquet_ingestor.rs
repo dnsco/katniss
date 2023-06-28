@@ -7,10 +7,7 @@ use tokio::{
     task::JoinSet,
 };
 
-use crate::{
-    pipeline::{ParquetConverter, StoreSink, TemporalRotator},
-    Result,
-};
+use crate::{pipeline::TemporalRotator, Result};
 use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
 
 /// Set Of Tokio Tasks that never return unless they error
@@ -28,24 +25,12 @@ pub async fn parquet_object_store_pipeline(
     object_store: Box<dyn ObjectStore>,
 ) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinset)> {
     let (head, rx_msg) = unbounded_channel();
-    let (mut rotator, rx_buf) = TemporalRotator::try_new(rx_msg, &props, Utc::now())?;
-    let (mut converter, rx_bytes) = ParquetConverter::new(rx_buf, props.schema);
-    let mut sink = StoreSink::new(rx_bytes, object_store);
+    let (mut rotator, _rx_buf) = TemporalRotator::try_new(rx_msg, &props, Utc::now())?;
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
         loop {
             rotator.process_next().await?
-        }
-    });
-    tasks.spawn(async move {
-        loop {
-            converter.process_next_buffer().await?;
-        }
-    });
-    tasks.spawn(async move {
-        loop {
-            sink.sink_next().await?;
         }
     });
 

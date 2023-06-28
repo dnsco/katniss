@@ -13,7 +13,6 @@ chrono.workspace = true
 itertools.workspace = true
 lance.workspace = true
 object_store.workspace = true
-parquet.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 

@@ -14,7 +14,6 @@ chrono = "0.4.26"
 clap = { version = "4.3.3", features = ["deprecated", "derive", "env"] }
 itertools = "0.10.5"
 object_store = { version = "0.5.6", features = ["gcp"] }
-parquet = "40.0.0"
 prost = "0.11.8"
 prost-reflect = "=0.10.2"
 tempfile = "3.6.0"

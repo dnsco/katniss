@@ -17,9 +17,6 @@ pub enum KatinssIngestorError {
     #[error("Io Errror")]
     IoError(#[from] std::io::Error),
 
-    #[error("Parquet Error: {0}")]
-    ParquetError(#[from] parquet::errors::ParquetError),
-
     #[error("Timelord Error: {0}")]
     TimeyWimeyStuff(#[from] SystemTimeError),
 

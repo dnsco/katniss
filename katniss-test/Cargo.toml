@@ -10,7 +10,6 @@ license = "Apache-2.0"
 anyhow.workspace = true
 arrow-schema.workspace = true
 clap.workspace = true
-parquet.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
 tracing.workspace = true

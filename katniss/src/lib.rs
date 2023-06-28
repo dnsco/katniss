@@ -5,6 +5,5 @@ pub mod exports {
     pub use arrow_array;
     pub use arrow_schema;
     pub use object_store;
-    pub use parquet;
     pub use prost_reflect;
 }

@@ -1,7 +1,7 @@
 use std::{any::type_name, path::PathBuf};
 
 use anyhow::Result;
-use katniss_ingestor::parquet::MultiBatchWriter;
+
 use prost::Message;
 use prost_reflect::DynamicMessage;
 
@@ -74,7 +74,8 @@ pub fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
     path.push(test_name);
     std::fs::create_dir_all(&path)?;
 
-    let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
-    writer.write_batch(batch)?;
+    // TODO: DO LANCE STUFF HERE
+    // let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
+    // writer.write_batch(batch)?;
     Ok(())
 }
