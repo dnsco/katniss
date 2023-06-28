@@ -4,17 +4,17 @@
 members = ["katniss", "katniss-ingestor", "katniss-pb2arrow", "katniss-test"]
 
 [workspace.dependencies]
-lance = "0.4.21"
-# lance = { git = "https://github.com/eto-ai/lance.git", branch = "main" }
+# lance = "0.5.2"
+lance = { git = "https://github.com/lancedb/lance.git", rev = "4a073c36eef08af9e9f329d111b02a4530b7fb79" }
 
 anyhow = "1.0.71"
-arrow-array = "37.0.0"
-arrow-schema = "37.0.0"
+arrow-array = "40.0.0"
+arrow-schema = "40.0.0"
 chrono = "0.4.26"
 clap = { version = "4.3.3", features = ["deprecated", "derive", "env"] }
 itertools = "0.10.5"
 object_store = { version = "0.5.6", features = ["gcp"] }
-parquet = "37.0.0"
+parquet = "40.0.0"
 prost = "0.11.8"
 prost-reflect = "=0.10.2"
 tempfile = "3.6.0"
