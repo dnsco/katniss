@@ -4,6 +4,7 @@
 members = ["katniss", "katniss-ingestor", "katniss-pb2arrow", "katniss-test"]
 
 [workspace.dependencies]
+lance = "0.4.21"
 # lance = { git = "https://github.com/eto-ai/lance.git", branch = "main" }
 
 anyhow = "1.0.71"

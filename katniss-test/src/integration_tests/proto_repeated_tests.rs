@@ -25,8 +25,8 @@ fn test_log_to_lance() -> Result<()> {
             descriptor_pool()?,
             "eto.pb2arrow.tests.spacecorp.Packet".to_owned(),
         )?,
-        Serialization::Parquet {
-            filename: "test_out.parquet",
+        Serialization::Lance {
+            filename: "test_out.lance",
         },
     )?;
 

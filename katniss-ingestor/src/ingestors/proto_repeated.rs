@@ -9,7 +9,7 @@ use katniss_pb2arrow::{
     ArrowBatchProps, Result as ProtoResult,
 };
 
-use super::{parquet_fs::ParquetFileIngestor, BatchIngestor};
+use super::{lance_fs_ingestor::LanceFsIngestor, parquet_fs::ParquetFileIngestor, BatchIngestor};
 
 pub struct RepeatedProtoIngestor<B: Buf> {
     bytes: B,
@@ -20,6 +20,7 @@ pub struct RepeatedProtoIngestor<B: Buf> {
 
 pub enum Serialization<P: AsRef<Path>> {
     Parquet { filename: P },
+    Lance { filename: P },
 }
 
 impl<B: Buf> RepeatedProtoIngestor<B> {
@@ -33,6 +34,9 @@ impl<B: Buf> RepeatedProtoIngestor<B> {
         let packet_ingestor: Box<dyn BatchIngestor> = match serialization {
             Serialization::Parquet { filename } => {
                 Box::new(ParquetFileIngestor::new(arrow_props, filename)?)
+            }
+            Serialization::Lance { filename } => {
+                Box::new(LanceFsIngestor::new(arrow_props, filename)?)
             }
         };
 

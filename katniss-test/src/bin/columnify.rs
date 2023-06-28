@@ -49,6 +49,7 @@ struct Cli {
 #[derive(clap::ValueEnum, Clone, Debug)]
 enum Format {
     Parquet,
+    Lance,
 }
 
 impl Cli {
@@ -67,12 +68,16 @@ impl Cli {
     fn extension(&self) -> &'static str {
         match self.format {
             Format::Parquet => "parquet",
+            Format::Lance => "lance",
         }
     }
 
     fn serialization(&self) -> Serialization<PathBuf> {
         match self.format {
             Format::Parquet => Serialization::Parquet {
+                filename: self.destination(),
+            },
+            Format::Lance => Serialization::Lance {
                 filename: self.destination(),
             },
         }
