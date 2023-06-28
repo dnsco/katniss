@@ -74,8 +74,8 @@ pub fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
     path.push(test_name);
     std::fs::create_dir_all(&path)?;
 
-    // TODO: DO LANCE STUFF HERE
-    // let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
-    // writer.write_batch(batch)?;
+    /// TODO: DO LANCE STUFF HERE
+    /// let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
+    /// writer.write_batch(batch)?;
     Ok(())
 }

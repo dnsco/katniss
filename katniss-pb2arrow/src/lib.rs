@@ -23,6 +23,10 @@ pub mod exports {
     pub use prost_reflect::DynamicMessage;
 }
 
+/// Holds an Arrow Schema and a Protobuf Message Descriptor
+/// Has all meta data necessary for converting between a bunch of protos to
+/// an Arrow Record Batch
+/// Dictionaries are stored seperately so that they can be mapped correctly in Arrow
 pub struct ArrowBatchProps {
     pub schema: Arc<Schema>,
     pub dictionaries: Arc<DictValuesContainer>,

@@ -7,7 +7,7 @@ use std::{
 use katniss_pb2arrow::KatnissArrowError;
 use thiserror::Error;
 
-use crate::pipeline::{TemporalBuffer, TemporalBytes};
+use crate::timestuff::{TemporalBuffer, TemporalBytes};
 
 #[derive(Error, Debug)]
 pub enum KatinssIngestorError {
