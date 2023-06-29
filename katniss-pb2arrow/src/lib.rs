@@ -36,7 +36,8 @@ pub struct ArrowBatchProps {
 
 impl ArrowBatchProps {
     pub fn try_new(pool: DescriptorPool, msg_name: String) -> Result<Self> {
-        let converter = SchemaConverter::new(pool);
+        let converter: SchemaConverter = SchemaConverter::new(pool);
+
         let (schema_opt, dictionaries_opt) =
             converter.get_arrow_schema_with_dictionaries(&msg_name, &[])?;
 
