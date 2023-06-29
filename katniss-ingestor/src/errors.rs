@@ -34,4 +34,7 @@ pub enum KatinssIngestorError {
 
     #[error("Object Store Error: {0}")]
     ObjectStoreError(#[from] object_store::Error),
+
+    #[error("Lance Error: {0}")]
+    LanceError(#[from] lance::Error),
 }
