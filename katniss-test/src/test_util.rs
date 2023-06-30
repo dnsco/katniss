@@ -5,9 +5,7 @@ use chrono::Utc;
 use prost::Message;
 use prost_reflect::DynamicMessage;
 
-use katniss_ingestor::lance_ingestion::LanceFsIngestor;
-use katniss_ingestor::timestuff::TemporalBuffer;
-
+use katniss_ingestor::{LanceFsIngestor, TemporalBuffer};
 use katniss_pb2arrow::{exports::RecordBatch, ArrowBatchProps, RecordConverter};
 
 use crate::{descriptor_pool, schema_converter};

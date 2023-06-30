@@ -7,7 +7,7 @@ use std::{
 use katniss_pb2arrow::KatnissArrowError;
 use thiserror::Error;
 
-use crate::timestuff::{TemporalBuffer, TemporalBytes};
+use crate::temporal_rotator::TemporalBuffer;
 
 #[derive(Error, Debug)]
 pub enum KatinssIngestorError {
@@ -25,9 +25,6 @@ pub enum KatinssIngestorError {
 
     #[error("Temporal Pipeline Clog: {0}")]
     TemporalBufferSend(#[from] SendError<TemporalBuffer>),
-
-    #[error("Parquet Pipeline Clog: {0}")]
-    ParquetBufferSend(#[from] SendError<TemporalBytes>),
 
     #[error("Pipeline Channel Closed")]
     PipelineClosed,

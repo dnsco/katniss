@@ -4,7 +4,7 @@ use std::path::Path;
 use chrono::Utc;
 use lance::arrow::RecordBatchBuffer;
 use lance::dataset::{Dataset, WriteMode, WriteParams};
-
+use tokio::runtime::Handle;
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
     task::{block_in_place, JoinSet},
@@ -15,7 +15,7 @@ use katniss_pb2arrow::exports::RecordBatchReader;
 use katniss_pb2arrow::ArrowBatchProps;
 
 use crate::errors::KatinssIngestorError;
-use crate::timestuff::{TemporalBuffer, TemporalRotator};
+use crate::temporal_rotator::{timestamp_string, TemporalBuffer, TemporalRotator};
 use crate::Result;
 
 /// Set Of Tokio Tasks that never return unless they error
@@ -33,8 +33,10 @@ pub async fn lance_ingestion_pipeline(
     // object_store: Box<dyn ObjectStore>, // this should probably be some sort of lance or gcp props or something
 ) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinset)> {
     let (head, mut rx_msg) = unbounded_channel();
-    let (tx_buffer, _rx_buffer) = unbounded_channel();
-    let mut rotator = TemporalRotator::try_new(&props, Utc::now())?;
+    let (tx_buffer, mut rx_buffer) = unbounded_channel();
+    let now = Utc::now();
+    let mut rotator = TemporalRotator::try_new(&props, now.clone())?;
+    let ingestor = LanceFsIngestor::new(timestamp_string(now))?;
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
@@ -51,6 +53,17 @@ pub async fn lance_ingestion_pipeline(
                     .send(last_batch)
                     .map_err(|_| KatinssIngestorError::PipelineClosed)?;
             }
+        }
+    });
+
+    tasks.spawn(async move {
+        loop {
+            let buf = rx_buffer
+                .recv()
+                .await
+                .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
+
+            Handle::current().block_on(ingestor.write(buf))?;
         }
     });
 

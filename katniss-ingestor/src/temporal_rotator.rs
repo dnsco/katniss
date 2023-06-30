@@ -1,9 +1,32 @@
-use super::TemporalBuffer;
-
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 
 use crate::{arrow::ProtobufBatchIngestor, Result};
-use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
+use katniss_pb2arrow::{
+    exports::{DynamicMessage, RecordBatch},
+    ArrowBatchProps,
+};
+
+#[derive(Debug)]
+pub struct TemporalBuffer {
+    pub begin_at: DateTime<Utc>,
+    pub end_at: DateTime<Utc>,
+    pub batches: Vec<RecordBatch>,
+}
+
+impl TemporalBuffer {
+    pub fn new(now: DateTime<Utc>) -> Self {
+        let end_at = now + Duration::seconds(60);
+        Self {
+            begin_at: now,
+            end_at,
+            batches: Vec::new(),
+        }
+    }
+}
+
+pub fn timestamp_string(time: DateTime<Utc>) -> String {
+    time.format("%Y-%m-%d-%H%M%S_utc").to_string()
+}
 
 /// Rotates the in-memory buffer it is written to per a timescale,
 /// Currently hardcoded to rotate every 60 seconds
@@ -55,7 +78,7 @@ impl TemporalRotator {
 mod tests {
     use super::*;
 
-    use chrono::Duration;
+    use chrono::{Duration, TimeZone};
     use katniss_pb2arrow::ArrowBatchProps;
 
     use katniss_test::{descriptor_pool, protos::spacecorp::Packet, test_util::to_dynamic};
@@ -110,6 +133,15 @@ mod tests {
         ); // two completed batches of 2
         assert_eq!(0, rotator.current.batches.len()); // Fresh temporal buffer has no batches
         assert_eq!(1, rotator.converter.len()); // one unprocessed record
+
+        Ok(())
+    }
+
+    #[test]
+    fn filenames_are_pretty() -> anyhow::Result<()> {
+        let now = Utc.timestamp_nanos(1678307941000000000);
+
+        assert_eq!(timestamp_string(now), "2023-03-08-203901_utc");
 
         Ok(())
     }
