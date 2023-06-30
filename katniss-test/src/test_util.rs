@@ -1,9 +1,12 @@
 use std::{any::type_name, path::PathBuf};
 
 use anyhow::Result;
-
+use chrono::Utc;
 use prost::Message;
 use prost_reflect::DynamicMessage;
+
+use katniss_ingestor::lance_ingestion::LanceFsIngestor;
+use katniss_ingestor::timestuff::TemporalBuffer;
 
 use katniss_pb2arrow::{exports::RecordBatch, ArrowBatchProps, RecordConverter};
 
@@ -67,15 +70,20 @@ fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
     type_name::<T>()
 }
 
-pub fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
+pub async fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
+    let now = Utc::now();
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("data");
     path.push("tests");
     path.push(test_name);
+    path.push(now.to_rfc2822());
     std::fs::create_dir_all(&path)?;
 
-    /// TODO: DO LANCE STUFF HERE
-    /// let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
-    /// writer.write_batch(batch)?;
+    let mut buffer = TemporalBuffer::new(now);
+    buffer.batches = vec![batch];
+    let ingestor = LanceFsIngestor::new(path)?;
+
+    ingestor.write(buffer).await?;
+
     Ok(())
 }

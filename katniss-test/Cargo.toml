@@ -9,9 +9,11 @@ license = "Apache-2.0"
 [dependencies]
 anyhow.workspace = true
 arrow-schema.workspace = true
+chrono.workspace = true
 clap.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
