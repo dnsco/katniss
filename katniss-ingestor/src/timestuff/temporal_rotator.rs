@@ -48,28 +48,36 @@ impl TemporalRotator {
             .recv()
             .await
             .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
-        block_in_place(|| self.ingest_potentially_blocking(msg, Utc::now()))
+        if let Some(last_batch) =
+            block_in_place(|| self.ingest_potentially_blocking(msg, Utc::now()))?
+        {
+            self.tx
+                .send(last_batch)
+                .map_err(|_| KatinssIngestorError::PipelineClosed)?;
+        }
+        Ok(())
     }
 
     fn ingest_potentially_blocking(
         &mut self,
         msg: DynamicMessage,
         now: DateTime<Utc>,
-    ) -> Result<()> {
+    ) -> Result<Option<TemporalBuffer>> {
+        let mut finished_batch = None;
         if now > self.current.end_at {
             let batch = self.converter.finish()?;
             self.current.batches.push(batch);
 
-            let old = std::mem::replace(&mut self.current, TemporalBuffer::new(now));
-            self.tx
-                .send(old)
-                .map_err(|_| KatinssIngestorError::PipelineClosed)?;
+            finished_batch = Some(std::mem::replace(
+                &mut self.current,
+                TemporalBuffer::new(now),
+            ));
         }
 
         if let Some(batch) = self.converter.ingest_message(msg)? {
             self.current.batches.push(batch)
         }
-        Ok(())
+        Ok(finished_batch)
     }
 }
 
@@ -121,12 +129,12 @@ mod tests {
         assert!(rx.try_recv().is_err());
 
         // ingesting a packet more than 60 seconds in future rotates buffers
-        rotator.ingest_potentially_blocking(
-            to_dynamic(&Packet::default(), PACKET)?,
-            start + Duration::seconds(61),
-        )?;
-
-        let buf = rx.try_recv().unwrap();
+        let buf = rotator
+            .ingest_potentially_blocking(
+                to_dynamic(&Packet::default(), PACKET)?,
+                start + Duration::seconds(61),
+            )?
+            .unwrap();
 
         assert_eq!(
             vec![2, 2, 1],
