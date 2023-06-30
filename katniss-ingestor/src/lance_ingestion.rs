@@ -7,13 +7,14 @@ use lance::dataset::{Dataset, WriteMode, WriteParams};
 
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
-    task::JoinSet,
+    task::{block_in_place, JoinSet},
 };
 
 use katniss_pb2arrow::exports::prost_reflect::DynamicMessage;
 use katniss_pb2arrow::exports::RecordBatchReader;
 use katniss_pb2arrow::ArrowBatchProps;
 
+use crate::errors::KatinssIngestorError;
 use crate::timestuff::{TemporalBuffer, TemporalRotator};
 use crate::Result;
 
@@ -31,13 +32,25 @@ pub async fn lance_ingestion_pipeline(
     props: ArrowBatchProps,
     // object_store: Box<dyn ObjectStore>, // this should probably be some sort of lance or gcp props or something
 ) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinset)> {
-    let (head, rx_msg) = unbounded_channel();
-    let (mut rotator, _rx_buf) = TemporalRotator::try_new(rx_msg, &props, Utc::now())?;
+    let (head, mut rx_msg) = unbounded_channel();
+    let (tx_buffer, _rx_buffer) = unbounded_channel();
+    let mut rotator = TemporalRotator::try_new(&props, Utc::now())?;
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
         loop {
-            rotator.process_next().await?
+            let msg = rx_msg
+                .recv()
+                .await
+                .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
+
+            if let Some(last_batch) =
+                block_in_place(|| rotator.ingest_potentially_blocking(msg, Utc::now()))?
+            {
+                tx_buffer
+                    .send(last_batch)
+                    .map_err(|_| KatinssIngestorError::PipelineClosed)?;
+            }
         }
     });
 

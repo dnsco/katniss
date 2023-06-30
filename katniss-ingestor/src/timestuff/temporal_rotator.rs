@@ -1,17 +1,9 @@
 use super::TemporalBuffer;
 
 use chrono::{DateTime, Utc};
-use tokio::{
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    task::block_in_place,
-};
 
-use crate::{arrow::ProtobufBatchIngestor, errors::KatinssIngestorError, Result};
+use crate::{arrow::ProtobufBatchIngestor, Result};
 use katniss_pb2arrow::{exports::DynamicMessage, ArrowBatchProps};
-
-type ChanIn = UnboundedReceiver<DynamicMessage>;
-type ChanOut = UnboundedSender<TemporalBuffer>;
-type ChanNext = UnboundedReceiver<TemporalBuffer>;
 
 /// Rotates the in-memory buffer it is written to per a timescale,
 /// Currently hardcoded to rotate every 60 seconds
@@ -20,45 +12,23 @@ type ChanNext = UnboundedReceiver<TemporalBuffer>;
 pub struct TemporalRotator {
     pub converter: ProtobufBatchIngestor,
     pub current: TemporalBuffer,
-    pub rx: ChanIn,
-    pub tx: ChanOut,
 }
 
 impl TemporalRotator {
-    pub fn try_new(
-        rx_in: ChanIn,
-        props: &ArrowBatchProps,
-        now: DateTime<Utc>,
-    ) -> Result<(Self, ChanNext)> {
-        let (tx_out, rx_next) = unbounded_channel();
-        Ok((
-            Self {
-                converter: ProtobufBatchIngestor::try_new(props)?,
-                current: TemporalBuffer::new(now),
-                rx: rx_in,
-                tx: tx_out,
-            },
-            rx_next,
-        ))
+    pub fn try_new(props: &ArrowBatchProps, now: DateTime<Utc>) -> Result<Self> {
+        Ok(Self {
+            converter: ProtobufBatchIngestor::try_new(props)?,
+            current: TemporalBuffer::new(now),
+        })
     }
 
-    pub async fn process_next(&mut self) -> Result<()> {
-        let msg = self
-            .rx
-            .recv()
-            .await
-            .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
-        if let Some(last_batch) =
-            block_in_place(|| self.ingest_potentially_blocking(msg, Utc::now()))?
-        {
-            self.tx
-                .send(last_batch)
-                .map_err(|_| KatinssIngestorError::PipelineClosed)?;
-        }
-        Ok(())
-    }
-
-    fn ingest_potentially_blocking(
+    /// Receives dynamic protobuf messages and sends them in to a temporal buffer
+    /// Rotates the temporal buffer if time boundary has been crossed
+    /// Returns the previous buffer if it has been rotated
+    /// Blocking: Encoding a protobuf batch to arrow which happens ever 1024 (by default) messages
+    /// or when the buffer has been rotated, theoretically blocks the thread [benchmarking needed]
+    /// maybe wrap with block_in_place upstream or maybe this is overly defensive
+    pub fn ingest_potentially_blocking(
         &mut self,
         msg: DynamicMessage,
         now: DateTime<Utc>,
@@ -95,9 +65,8 @@ mod tests {
     #[test]
     fn it_rotates_on_a_time_period() -> anyhow::Result<()> {
         let start = Utc::now();
-        let (_tx, rx_in) = unbounded_channel();
-        let (mut rotator, mut rx) = TemporalRotator::try_new(
-            rx_in,
+
+        let mut rotator = TemporalRotator::try_new(
             &ArrowBatchProps::try_new(descriptor_pool()?, PACKET.to_owned())?
                 .with_records_per_arrow_batch(2),
             start,
@@ -126,7 +95,6 @@ mod tests {
 
         assert_eq!(2, rotator.current.batches.len()); //two completed batches of 2
         assert_eq!(1, rotator.converter.len()); //one unprocessed record
-        assert!(rx.try_recv().is_err());
 
         // ingesting a packet more than 60 seconds in future rotates buffers
         let buf = rotator
