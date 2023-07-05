@@ -4,6 +4,7 @@ use arrow_array::RecordBatchIterator;
 use arrow_schema::Schema;
 use chrono::Utc;
 use lance::dataset::{Dataset, WriteMode, WriteParams};
+
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
     task::{block_in_place, JoinSet},
@@ -17,7 +18,7 @@ use crate::temporal_rotator::{timestamp_string, TemporalBuffer, TemporalRotator}
 use crate::Result;
 
 /// Set Of Tokio Tasks that never return unless they error
-pub type LoopJoinset = JoinSet<Result<Infallible>>; // (Infallible used in place of !)
+pub type LoopJoinSet = JoinSet<Result<Infallible>>; // (Infallible used in place of !)
 
 /// Start a pipeline that ingests dynamic messages to Lance
 /// Returns:
@@ -29,7 +30,7 @@ pub type LoopJoinset = JoinSet<Result<Infallible>>; // (Infallible used in place
 pub async fn lance_ingestion_pipeline(
     props: ArrowBatchProps,
     // object_store: Box<dyn ObjectStore>, // this should probably be some sort of lance or gcp props or something
-) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinset)> {
+) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinSet)> {
     let (head, mut rx_msg) = unbounded_channel();
     let (tx_buffer, mut rx_buffer) = unbounded_channel();
     let now = Utc::now();
