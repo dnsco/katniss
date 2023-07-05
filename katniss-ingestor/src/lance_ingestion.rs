@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 use std::path::Path;
 
+use arrow_array::RecordBatchIterator;
 use chrono::Utc;
-use lance::arrow::RecordBatchBuffer;
 use lance::dataset::{Dataset, WriteMode, WriteParams};
 use tokio::runtime::Handle;
 use tokio::{
@@ -11,7 +11,7 @@ use tokio::{
 };
 
 use katniss_pb2arrow::exports::prost_reflect::DynamicMessage;
-use katniss_pb2arrow::exports::RecordBatchReader;
+
 use katniss_pb2arrow::ArrowBatchProps;
 
 use crate::errors::KatinssIngestorError;
@@ -91,8 +91,8 @@ impl LanceFsIngestor {
     }
 
     pub async fn write(&self, buffer: TemporalBuffer) -> Result<Dataset> {
-        let mut reader: Box<dyn RecordBatchReader> =
-            Box::new(RecordBatchBuffer::new(buffer.batches));
+        let schema = buffer.batches[0].schema().clone();
+        let mut reader = RecordBatchIterator::new(buffer.batches.into_iter().map(Ok), schema);
 
         let dataset =
             Dataset::write(&mut reader, self.filename.as_ref(), Some(self.write_params)).await?;
