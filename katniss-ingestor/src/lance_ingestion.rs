@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::{convert::Infallible, sync::Arc};
 
 use arrow_array::RecordBatchIterator;
@@ -35,7 +34,7 @@ pub async fn lance_ingestion_pipeline(
     let (tx_buffer, mut rx_buffer) = unbounded_channel();
     let now = Utc::now();
     let mut rotator = TemporalRotator::try_new(&props, now)?;
-    let ingestor = LanceFsIngestor::new(timestamp_string(now), props.schema)?;
+    let ingestor = LanceIngestor::new(timestamp_string(now), props.schema)?;
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
@@ -69,15 +68,16 @@ pub async fn lance_ingestion_pipeline(
     Ok((head, tasks))
 }
 
-pub struct LanceFsIngestor {
-    filename: String,
+pub struct LanceIngestor {
+    ///object-store formatted uri i.e gcp:// or file://
+    storage_uri: String,
     write_params: WriteParams,
     schema: Arc<Schema>,
 }
 
-impl LanceFsIngestor {
-    pub fn new<P: AsRef<Path>>(filename: P, schema: Arc<Schema>) -> Result<Self> {
-        let filename = filename.as_ref().to_str().unwrap().to_string();
+impl LanceIngestor {
+    pub fn new<P: AsRef<str>>(storage_uri: P, schema: Arc<Schema>) -> Result<Self> {
+        let filename = storage_uri.as_ref().to_string();
         let write_params = WriteParams {
             max_rows_per_group: 1024 * 10,
             mode: WriteMode::Append,
@@ -85,7 +85,7 @@ impl LanceFsIngestor {
         };
 
         Ok(Self {
-            filename,
+            storage_uri: filename,
             write_params,
             schema,
         })
@@ -96,7 +96,7 @@ impl LanceFsIngestor {
             RecordBatchIterator::new(buffer.batches.into_iter().map(Ok), self.schema.clone());
 
         let dataset =
-            Dataset::write(reader, self.filename.as_ref(), Some(self.write_params)).await?;
+            Dataset::write(reader, self.storage_uri.as_ref(), Some(self.write_params)).await?;
 
         Ok(dataset)
     }
@@ -136,8 +136,11 @@ mod tests {
         .arrow_batch()?;
 
         let schema = batch.schema();
+        let mut filename = std::env::current_dir()?;
+        filename.push(format!("test_{now}.lance"));
 
-        let ingestor = LanceFsIngestor::new(format!("test_{now}.lance"), schema)?;
+        let ingestor =
+            LanceIngestor::new(format!("file://{}", filename.to_str().unwrap()), schema)?;
 
         let buffer: TemporalBuffer = TemporalBuffer {
             begin_at: Utc::now(),

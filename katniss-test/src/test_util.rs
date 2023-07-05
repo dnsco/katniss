@@ -5,7 +5,7 @@ use chrono::Utc;
 use prost::Message;
 use prost_reflect::DynamicMessage;
 
-use katniss_ingestor::{LanceFsIngestor, TemporalBuffer};
+use katniss_ingestor::{LanceIngestor, TemporalBuffer};
 use katniss_pb2arrow::{exports::RecordBatch, ArrowBatchProps, RecordConverter};
 
 use crate::{descriptor_pool, schema_converter};
@@ -77,7 +77,7 @@ pub async fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<
     path.push(now.to_rfc2822());
     std::fs::create_dir_all(&path)?;
 
-    let ingestor = LanceFsIngestor::new(path, batch.schema())?;
+    let ingestor = LanceIngestor::new(path.as_os_str().to_str().unwrap(), batch.schema())?;
 
     let mut buffer = TemporalBuffer::new(now);
     buffer.batches = vec![batch];
