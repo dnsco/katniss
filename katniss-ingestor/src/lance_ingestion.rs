@@ -32,44 +32,8 @@ pub async fn lance_ingestion_pipeline(
     // object_store: Box<dyn ObjectStore>, // this should probably be some sort of lance or gcp props or something
 ) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinSet)> {
     let now = Utc::now();
-    let mut rotator = TemporalRotator::try_new(&props, now)?;
-    let (head, mut rx_msg) = unbounded_channel();
-    let (tx_buffer, mut rx_buffer) = unbounded_channel();
-    let ingestor = LanceIngestor::new(
-        format!("file:///Users/mo/{}.lance", timestamp_string(now)),
-        props.schema,
-    )?;
-
-    let mut tasks = JoinSet::new();
-    tasks.spawn(async move {
-        loop {
-            let msg = rx_msg
-                .recv()
-                .await
-                .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
-
-            if let Some(last_batch) =
-                block_in_place(|| rotator.ingest_potentially_blocking(msg, Utc::now()))?
-            {
-                tx_buffer
-                    .send(last_batch)
-                    .map_err(|_| KatinssIngestorError::PipelineClosed)?;
-            }
-        }
-    });
-
-    tasks.spawn(async move {
-        loop {
-            let buf = rx_buffer
-                .recv()
-                .await
-                .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
-
-            ingestor.write(buf).await?;
-        }
-    });
-
-    Ok((head, tasks))
+    let rotator = TemporalRotator::try_new(&props, now)?;
+    configure_pipeline(props, rotator)
 }
 
 #[allow(dead_code)]
@@ -238,7 +202,9 @@ mod tests {
         let arrow_props = timestamp_encoding_props();
         let descriptor = arrow_props.descriptor.clone();
 
-        let (head, mut tasks) = lance_ingestion_pipeline(arrow_props).await.unwrap();
+        let (head, mut tasks) = lance_ingestion_pipeline_with_duration(arrow_props, 1)
+            .await
+            .unwrap();
 
         let sent = AtomicI64::new(0);
         spawn(async move {
