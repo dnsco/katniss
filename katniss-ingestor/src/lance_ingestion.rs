@@ -35,7 +35,10 @@ pub async fn lance_ingestion_pipeline(
     let (tx_buffer, mut rx_buffer) = unbounded_channel();
     let now = Utc::now();
     let mut rotator = TemporalRotator::try_new(&props, now)?;
-    let ingestor = LanceIngestor::new(timestamp_string(now), props.schema)?;
+    let ingestor = LanceIngestor::new(
+        format!("file:///Users/mo/{}.lance", timestamp_string(now)),
+        props.schema,
+    )?;
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
@@ -105,8 +108,12 @@ impl LanceIngestor {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::AtomicI64;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+    use tokio::{select, spawn, task::yield_now};
+
+    use katniss_pb2arrow::exports::prost_reflect::prost::Message;
     use katniss_test::{descriptor_pool, protos::spacecorp::Timestamp, test_util::ProtoBatch};
 
     use super::*;
@@ -167,20 +174,46 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "This can only be integration tested and that is sad and I don't like being sad"]
-    #[tokio::test]
-    async fn test_pipeline() {
+    #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+    async fn test_pipeline() -> anyhow::Result<()> {
         // make a pipeline
         // feed it some records
         // drop the pipeline (we currently drop data that hasn't ended temporal window and we don't want to do that)
         // read lance from like filesystem or something and assert it has the number of records
 
         let arrow_props = timestamp_encoding_props();
-        let (_head, _tasks) = lance_ingestion_pipeline(arrow_props).await.unwrap();
+        let descriptor = arrow_props.descriptor.clone();
 
-        // we have a pipeline for sending messages about spacecorps' Timestamp message
-        // how do we create and send messages in test: protubuf -> arrow -> lance?
-        // how should "some sort of lance or gcp props or something" interact with the pipeline? maybe the deleted parquet code has a hint
-        // what is the relationship between the pipeline and the ingestor/(owner of write())?
+        let (head, mut tasks) = lance_ingestion_pipeline(arrow_props).await.unwrap();
+
+        let sent = AtomicI64::new(0);
+        spawn(async move {
+            loop {
+                let msg = DynamicMessage::decode(
+                    descriptor.clone(),
+                    &Timestamp::system_now().encode_to_vec()[..],
+                )
+                .unwrap();
+                head.send(msg).unwrap();
+
+                sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                yield_now().await
+            }
+        });
+
+        //TODO: Make temporal rotator take a time scale (currently hardcoded to 1 minute, make it be perhaps 5ms for test?)
+
+        /// Wait 10 milliseconds for pipeline to do pipeline stuff
+        select! {
+            () = tokio::time::sleep(Duration::from_millis(10)) => (),
+            err = tasks.join_next() => {
+                err.unwrap().unwrap().unwrap();
+                ()
+            }
+        };
+
+        Ok(())
+
+        //TODO: Read entire lance dataset and ensure that number of rows = sent
     }
 }
