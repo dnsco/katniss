@@ -18,8 +18,8 @@ impl TemporalBuffer {
         TemporalBuffer::new_with_duration(now, 60)
     }
 
-    pub fn new_with_duration(now: DateTime<Utc>, duration_seconds: i64) -> Self {
-        let end_at = now + Duration::seconds(duration_seconds);
+    pub fn new_with_duration(now: DateTime<Utc>, duration_ms: i64) -> Self {
+        let end_at = now + Duration::milliseconds(duration_ms);
         Self {
             begin_at: now,
             end_at,
@@ -33,8 +33,8 @@ pub fn timestamp_string(time: DateTime<Utc>) -> String {
 }
 
 /// Rotates the in-memory buffer it is written to per a timescale,
-/// Instantiating with try_new() is hardcoded to rotate every 60 seconds.
-/// Instantiating with try_new_with_duration() allows for varying the rotation duration in seconds.
+/// Instantiating with try_new() is hardcoded to rotate every 6000 millseconds.
+/// Instantiating with try_new_with_duration() allows for varying the rotation duration in milliseconds.
 /// we should probably do some more timelord stuff to have buffers line up with minutes
 /// we could also make the duration configurable but YOLO
 pub struct TemporalRotator {
@@ -54,11 +54,11 @@ impl TemporalRotator {
     pub fn try_new_with_duration(
         props: &ArrowBatchProps,
         now: DateTime<Utc>,
-        duration_seconds: i64,
+        duration_ms: i64,
     ) -> Result<Self> {
         Ok(Self {
             converter: ProtobufBatchIngestor::try_new(props)?,
-            current: TemporalBuffer::new_with_duration(now, duration_seconds),
+            current: TemporalBuffer::new_with_duration(now, duration_ms),
         })
     }
 
@@ -110,38 +110,38 @@ mod tests {
             &ArrowBatchProps::try_new(descriptor_pool()?, PACKET.to_owned())?
                 .with_records_per_arrow_batch(2),
             start,
-            30,
+            60,
         )?;
 
         rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
-            start + Duration::seconds(1),
+            start + Duration::milliseconds(1),
         )?;
         rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
-            start + Duration::seconds(2),
+            start + Duration::milliseconds(2),
         )?;
         rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
-            start + Duration::seconds(5),
+            start + Duration::milliseconds(5),
         )?;
         rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
-            start + Duration::seconds(10),
+            start + Duration::milliseconds(10),
         )?;
         rotator.ingest_potentially_blocking(
             to_dynamic(&Packet::default(), PACKET)?,
-            start + Duration::seconds(20),
+            start + Duration::milliseconds(20),
         )?;
 
         assert_eq!(2, rotator.current.batches.len()); //two completed batches of 2
         assert_eq!(1, rotator.converter.len()); //one unprocessed record
 
-        // ingesting a packet more than 60 seconds in future rotates buffers
+        // ingesting a packet more than 60 milliseconds in the future rotates buffers
         let buf = rotator
             .ingest_potentially_blocking(
                 to_dynamic(&Packet::default(), PACKET)?,
-                start + Duration::seconds(31),
+                start + Duration::milliseconds(61),
             )?
             .unwrap();
 
