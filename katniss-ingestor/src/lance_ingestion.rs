@@ -202,7 +202,7 @@ mod tests {
         let arrow_props = timestamp_encoding_props();
         let descriptor = arrow_props.descriptor.clone();
 
-        let (head, mut tasks) = lance_ingestion_pipeline_with_duration(arrow_props, 1)
+        let (head, mut tasks) = lance_ingestion_pipeline_with_duration(arrow_props, 5)
             .await
             .unwrap();
 
