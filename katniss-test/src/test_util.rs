@@ -77,9 +77,10 @@ pub async fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<
     path.push(now.to_rfc2822());
     std::fs::create_dir_all(&path)?;
 
+    let ingestor = LanceFsIngestor::new(path, batch.schema())?;
+
     let mut buffer = TemporalBuffer::new(now);
     buffer.batches = vec![batch];
-    let ingestor = LanceFsIngestor::new(path)?;
 
     ingestor.write(buffer).await?;
 

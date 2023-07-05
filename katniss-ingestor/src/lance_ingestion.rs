@@ -1,7 +1,8 @@
-use std::convert::Infallible;
 use std::path::Path;
+use std::{convert::Infallible, sync::Arc};
 
 use arrow_array::RecordBatchIterator;
+use arrow_schema::Schema;
 use chrono::Utc;
 use lance::dataset::{Dataset, WriteMode, WriteParams};
 use tokio::{
@@ -34,7 +35,7 @@ pub async fn lance_ingestion_pipeline(
     let (tx_buffer, mut rx_buffer) = unbounded_channel();
     let now = Utc::now();
     let mut rotator = TemporalRotator::try_new(&props, now)?;
-    let ingestor = LanceFsIngestor::new(timestamp_string(now))?;
+    let ingestor = LanceFsIngestor::new(timestamp_string(now), props.schema)?;
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
@@ -71,10 +72,11 @@ pub async fn lance_ingestion_pipeline(
 pub struct LanceFsIngestor {
     filename: String,
     write_params: WriteParams,
+    schema: Arc<Schema>,
 }
 
 impl LanceFsIngestor {
-    pub fn new<P: AsRef<Path>>(filename: P) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(filename: P, schema: Arc<Schema>) -> Result<Self> {
         let filename = filename.as_ref().to_str().unwrap().to_string();
         let write_params = WriteParams {
             max_rows_per_group: 1024 * 10,
@@ -85,12 +87,13 @@ impl LanceFsIngestor {
         Ok(Self {
             filename,
             write_params,
+            schema,
         })
     }
 
     pub async fn write(&self, buffer: TemporalBuffer) -> Result<Dataset> {
-        let schema = buffer.batches[0].schema();
-        let reader = RecordBatchIterator::new(buffer.batches.into_iter().map(Ok), schema);
+        let reader =
+            RecordBatchIterator::new(buffer.batches.into_iter().map(Ok), self.schema.clone());
 
         let dataset =
             Dataset::write(reader, self.filename.as_ref(), Some(self.write_params)).await?;
@@ -124,8 +127,6 @@ mod tests {
             .as_micros()
             .to_string();
 
-        let ingestor = LanceFsIngestor::new(format!("test_{now}.lance"))?;
-
         // does this batch's structure mean we can eject ArrowProps?  currently not in use.
         let batch = ProtoBatch::SpaceCorp(&[
             Timestamp::default(),
@@ -133,6 +134,10 @@ mod tests {
             Timestamp::default(),
         ])
         .arrow_batch()?;
+
+        let schema = batch.schema();
+
+        let ingestor = LanceFsIngestor::new(format!("test_{now}.lance"), schema)?;
 
         let buffer: TemporalBuffer = TemporalBuffer {
             begin_at: Utc::now(),
