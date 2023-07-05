@@ -15,7 +15,11 @@ pub struct TemporalBuffer {
 
 impl TemporalBuffer {
     pub fn new(now: DateTime<Utc>) -> Self {
-        let end_at = now + Duration::seconds(60);
+        TemporalBuffer::new_with_duration(now, 60)
+    }
+
+    pub fn new_with_duration(now: DateTime<Utc>, duration_seconds: i64) -> Self {
+        let end_at = now + Duration::seconds(duration_seconds);
         Self {
             begin_at: now,
             end_at,
@@ -29,7 +33,8 @@ pub fn timestamp_string(time: DateTime<Utc>) -> String {
 }
 
 /// Rotates the in-memory buffer it is written to per a timescale,
-/// Currently hardcoded to rotate every 60 seconds
+/// Instantiating with try_new() is hardcoded to rotate every 60 seconds.
+/// Instantiating with try_new_with_duration() allows for varying the rotation duration in seconds.
 /// we should probably do some more timelord stuff to have buffers line up with minutes
 /// we could also make the duration configurable but YOLO
 pub struct TemporalRotator {
@@ -42,6 +47,18 @@ impl TemporalRotator {
         Ok(Self {
             converter: ProtobufBatchIngestor::try_new(props)?,
             current: TemporalBuffer::new(now),
+        })
+    }
+
+    #[allow(dead_code)]
+    pub fn try_new_with_duration(
+        props: &ArrowBatchProps,
+        now: DateTime<Utc>,
+        duration_seconds: i64,
+    ) -> Result<Self> {
+        Ok(Self {
+            converter: ProtobufBatchIngestor::try_new(props)?,
+            current: TemporalBuffer::new_with_duration(now, duration_seconds),
         })
     }
 
@@ -89,10 +106,11 @@ mod tests {
     fn it_rotates_on_a_time_period() -> anyhow::Result<()> {
         let start = Utc::now();
 
-        let mut rotator = TemporalRotator::try_new(
+        let mut rotator = TemporalRotator::try_new_with_duration(
             &ArrowBatchProps::try_new(descriptor_pool()?, PACKET.to_owned())?
                 .with_records_per_arrow_batch(2),
             start,
+            30,
         )?;
 
         rotator.ingest_potentially_blocking(
@@ -123,7 +141,7 @@ mod tests {
         let buf = rotator
             .ingest_potentially_blocking(
                 to_dynamic(&Packet::default(), PACKET)?,
-                start + Duration::seconds(61),
+                start + Duration::seconds(31),
             )?
             .unwrap();
 

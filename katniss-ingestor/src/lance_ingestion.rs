@@ -202,8 +202,10 @@ mod tests {
         });
 
         //TODO: Make temporal rotator take a time scale (currently hardcoded to 1 minute, make it be perhaps 5ms for test?)
+        // after timeframe of test has been reduced to a minute we should be writing to file system
+        // we can then make write location configurable
 
-        /// Wait 10 milliseconds for pipeline to do pipeline stuff
+        // Wait 10 milliseconds for pipeline to do pipeline stuff
         select! {
             () = tokio::time::sleep(Duration::from_millis(10)) => (),
             err = tasks.join_next() => {
