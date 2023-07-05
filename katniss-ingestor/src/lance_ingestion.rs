@@ -4,14 +4,12 @@ use std::path::Path;
 use arrow_array::RecordBatchIterator;
 use chrono::Utc;
 use lance::dataset::{Dataset, WriteMode, WriteParams};
-use tokio::runtime::Handle;
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
     task::{block_in_place, JoinSet},
 };
 
 use katniss_pb2arrow::exports::prost_reflect::DynamicMessage;
-
 use katniss_pb2arrow::ArrowBatchProps;
 
 use crate::errors::KatinssIngestorError;
@@ -35,7 +33,7 @@ pub async fn lance_ingestion_pipeline(
     let (head, mut rx_msg) = unbounded_channel();
     let (tx_buffer, mut rx_buffer) = unbounded_channel();
     let now = Utc::now();
-    let mut rotator = TemporalRotator::try_new(&props, now.clone())?;
+    let mut rotator = TemporalRotator::try_new(&props, now)?;
     let ingestor = LanceFsIngestor::new(timestamp_string(now))?;
 
     let mut tasks = JoinSet::new();
@@ -63,7 +61,7 @@ pub async fn lance_ingestion_pipeline(
                 .await
                 .ok_or_else(|| KatinssIngestorError::PipelineClosed)?;
 
-            Handle::current().block_on(ingestor.write(buf))?;
+            ingestor.write(buf).await?;
         }
     });
 
@@ -91,11 +89,11 @@ impl LanceFsIngestor {
     }
 
     pub async fn write(&self, buffer: TemporalBuffer) -> Result<Dataset> {
-        let schema = buffer.batches[0].schema().clone();
-        let mut reader = RecordBatchIterator::new(buffer.batches.into_iter().map(Ok), schema);
+        let schema = buffer.batches[0].schema();
+        let reader = RecordBatchIterator::new(buffer.batches.into_iter().map(Ok), schema);
 
         let dataset =
-            Dataset::write(&mut reader, self.filename.as_ref(), Some(self.write_params)).await?;
+            Dataset::write(reader, self.filename.as_ref(), Some(self.write_params)).await?;
 
         Ok(dataset)
     }
@@ -112,8 +110,7 @@ mod tests {
     fn timestamp_encoding_props() -> ArrowBatchProps {
         let pool = descriptor_pool().unwrap();
         let msg_name = "eto.pb2arrow.tests.spacecorp.Timestamp";
-        let arrow_props = ArrowBatchProps::try_new(pool, msg_name.to_string()).unwrap();
-        arrow_props
+        ArrowBatchProps::try_new(pool, msg_name.to_string()).unwrap()
     }
 
     // Alter our tests to maybe force our exploration of lance apis
