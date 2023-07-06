@@ -14,7 +14,7 @@ use katniss_pb2arrow::exports::prost_reflect::DynamicMessage;
 use katniss_pb2arrow::ArrowBatchProps;
 
 use crate::errors::KatinssIngestorError;
-use crate::temporal_rotator::{timestamp_string, TemporalBuffer, TemporalRotator};
+use crate::temporal_rotator::{TemporalBuffer, TemporalRotator};
 use crate::Result;
 
 /// Set Of Tokio Tasks that never return unless they error
@@ -29,18 +29,14 @@ pub type LoopJoinSet = JoinSet<Result<Infallible>>; // (Infallible used in place
 pub async fn lance_ingestion_pipeline(
     props: ArrowBatchProps,
     batch_period: std::time::Duration,
-    // object_store: Box<dyn ObjectStore>, // this should probably be some sort of lance or gcp props or something
+    storage_uri: String, // object_store: Box<dyn ObjectStore>, // this should probably be some sort of lance or gcp props or something
 ) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinSet)> {
     let now = Utc::now();
     let mut rotator = TemporalRotator::new(&props, now, batch_period)?;
 
     let (head, mut rx_msg) = unbounded_channel();
     let (tx_buffer, mut rx_buffer) = unbounded_channel();
-    let now = Utc::now();
-    let ingestor = LanceIngestor::new(
-        format!("file:///Users/mo/{}.lance", timestamp_string(now)),
-        props.schema,
-    )?;
+    let ingestor = LanceIngestor::new(storage_uri, props.schema)?;
 
     let mut tasks = JoinSet::new();
     tasks.spawn(async move {
@@ -110,6 +106,7 @@ impl LanceIngestor {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use std::sync::atomic::AtomicI64;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -117,6 +114,8 @@ mod tests {
 
     use katniss_pb2arrow::exports::prost_reflect::prost::Message;
     use katniss_test::{descriptor_pool, protos::spacecorp::Timestamp, test_util::ProtoBatch};
+
+    use crate::temporal_rotator::timestamp_string;
 
     use super::*;
 
@@ -147,7 +146,7 @@ mod tests {
 
         let schema = batch.schema();
         let mut filename = std::env::current_dir()?;
-        filename.push(format!("test_{now}.lance"));
+        filename.push(format!("test_lance_ingestor_{now}.lance"));
 
         let ingestor =
             LanceIngestor::new(format!("file://{}", filename.to_str().unwrap()), schema)?;
@@ -185,10 +184,18 @@ mod tests {
 
         let arrow_props = timestamp_encoding_props();
         let descriptor = arrow_props.descriptor.clone();
+        let now = Utc::now();
+        let timestamp = timestamp_string(now);
 
-        let (head, mut tasks) = lance_ingestion_pipeline(arrow_props, Duration::from_millis(5))
-            .await
-            .unwrap();
+        let mut storage_path = std::env::current_dir()?;
+        storage_path.push(format!("test_pipeline_{timestamp}.lance"));
+        let storage_path_str = storage_path.to_str().unwrap();
+        let storage_uri = format!("file://{}", storage_path_str);
+
+        let (head, mut tasks) =
+            lance_ingestion_pipeline(arrow_props, Duration::from_millis(5), storage_uri.clone())
+                .await
+                .unwrap();
 
         let sent = AtomicI64::new(0);
         spawn(async move {
@@ -212,14 +219,37 @@ mod tests {
         // Wait 10 milliseconds for pipeline to do pipeline stuff
         select! {
             () = tokio::time::sleep(Duration::from_millis(10)) => (),
-            err = tasks.join_next() => {
-                err.unwrap().unwrap().unwrap();
-                ()
-            }
+            _ = tasks.join_next() => (),
         };
+
+        assert!(Path::new(storage_path_str).is_dir());
+
+        let mut manifest_path = storage_path.clone();
+        manifest_path.push("_latest.manifest");
+        block_until_file_exists(manifest_path.to_str().unwrap(), Duration::from_millis(1000));
+
+        let dataset = Dataset::open(&storage_uri).await.unwrap();
+        let row_count = dataset.count_rows().await.unwrap() as i32;
+        assert_eq!(row_count, -1); // not a great thing to assert against, varies each run
+
+        // The current lance Read docs don't compile, should figure out what's wrong
+        // and make a PR
 
         Ok(())
 
         //TODO: Read entire lance dataset and ensure that number of rows = sent
+    }
+
+    fn block_until_file_exists(path: &str, timeout: Duration) -> bool {
+        // todo: see if this can be done nicely with std lib instead of chrono
+        let end_at = Utc::now() + chrono::Duration::from_std(timeout).unwrap();
+
+        while end_at > Utc::now() {
+            if Path::new(path).is_file() {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

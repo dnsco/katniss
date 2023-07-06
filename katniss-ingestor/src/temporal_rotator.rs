@@ -26,6 +26,7 @@ impl TemporalBuffer {
     }
 }
 
+#[allow(dead_code)]
 pub fn timestamp_string(time: DateTime<Utc>) -> String {
     time.format("%Y-%m-%d-%H%M%S_utc").to_string()
 }
