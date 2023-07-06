@@ -1,4 +1,6 @@
-use chrono::{DateTime, Duration, Utc};
+use std::time::Duration;
+
+use chrono::{DateTime, Utc};
 
 use crate::{arrow::ProtobufBatchIngestor, Result};
 use katniss_pb2arrow::{
@@ -14,17 +16,13 @@ pub struct TemporalBuffer {
 }
 
 impl TemporalBuffer {
-    pub fn new(now: DateTime<Utc>) -> Self {
-        TemporalBuffer::new_with_duration(now, 60)
-    }
-
-    pub fn new_with_duration(now: DateTime<Utc>, duration_ms: i64) -> Self {
-        let end_at = now + Duration::milliseconds(duration_ms);
-        Self {
+    pub fn new(now: DateTime<Utc>, period: Duration) -> Result<Self> {
+        let end_at = now + chrono::Duration::from_std(period)?;
+        Ok(Self {
             begin_at: now,
             end_at,
             batches: Vec::new(),
-        }
+        })
     }
 }
 
@@ -32,33 +30,19 @@ pub fn timestamp_string(time: DateTime<Utc>) -> String {
     time.format("%Y-%m-%d-%H%M%S_utc").to_string()
 }
 
-/// Rotates the in-memory buffer it is written to per a timescale,
-/// Instantiating with try_new() is hardcoded to rotate every 6000 millseconds.
-/// Instantiating with try_new_with_duration() allows for varying the rotation duration in milliseconds.
-/// we should probably do some more timelord stuff to have buffers line up with minutes
-/// we could also make the duration configurable but YOLO
+/// Collects RecordBatches into buffers which get rotated every $batch_period of time.
 pub struct TemporalRotator {
     pub converter: ProtobufBatchIngestor,
     pub current: TemporalBuffer,
+    batch_period: Duration,
 }
 
 impl TemporalRotator {
-    pub fn try_new(props: &ArrowBatchProps, now: DateTime<Utc>) -> Result<Self> {
+    pub fn new(props: &ArrowBatchProps, now: DateTime<Utc>, period: Duration) -> Result<Self> {
         Ok(Self {
             converter: ProtobufBatchIngestor::try_new(props)?,
-            current: TemporalBuffer::new(now),
-        })
-    }
-
-    #[allow(dead_code)]
-    pub fn try_new_with_duration(
-        props: &ArrowBatchProps,
-        now: DateTime<Utc>,
-        duration_ms: i64,
-    ) -> Result<Self> {
-        Ok(Self {
-            converter: ProtobufBatchIngestor::try_new(props)?,
-            current: TemporalBuffer::new_with_duration(now, duration_ms),
+            current: TemporalBuffer::new(now, period)?,
+            batch_period: period,
         })
     }
 
@@ -76,12 +60,10 @@ impl TemporalRotator {
         let mut finished_batch = None;
         if now > self.current.end_at {
             let batch = self.converter.finish()?;
+            let new = TemporalBuffer::new(now, self.batch_period)?;
+            // constructing new before pushing as it's theoretically fallible to avoid memory leak
             self.current.batches.push(batch);
-
-            finished_batch = Some(std::mem::replace(
-                &mut self.current,
-                TemporalBuffer::new(now),
-            ));
+            finished_batch = Some(std::mem::replace(&mut self.current, new));
         }
 
         if let Some(batch) = self.converter.ingest_message(msg)? {
@@ -106,11 +88,11 @@ mod tests {
     fn it_rotates_on_a_time_period() -> anyhow::Result<()> {
         let start = Utc::now();
 
-        let mut rotator = TemporalRotator::try_new_with_duration(
+        let mut rotator = TemporalRotator::new(
             &ArrowBatchProps::try_new(descriptor_pool()?, PACKET.to_owned())?
                 .with_records_per_arrow_batch(2),
             start,
-            60,
+            std::time::Duration::from_millis(60),
         )?;
 
         rotator.ingest_potentially_blocking(

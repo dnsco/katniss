@@ -1,4 +1,4 @@
-use std::{any::type_name, path::PathBuf};
+use std::{any::type_name, path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use chrono::Utc;
@@ -79,7 +79,7 @@ pub async fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<
 
     let ingestor = LanceIngestor::new(path.as_os_str().to_str().unwrap(), batch.schema())?;
 
-    let mut buffer = TemporalBuffer::new(now);
+    let mut buffer = TemporalBuffer::new(now, Duration::from_secs(1))?;
     buffer.batches = vec![batch];
 
     ingestor.write(buffer).await?;

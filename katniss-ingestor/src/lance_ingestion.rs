@@ -25,31 +25,15 @@ pub type LoopJoinSet = JoinSet<Result<Infallible>>; // (Infallible used in place
 /// * a channel that functions as the head of the pipeline
 /// * A Set of Infinite Loop Futures for:
 ///     - ArrowEncoding
-///     - ParquetEncoding
-///     - Disk access
+///     - Disk Encoding (i.e. Lance)
 pub async fn lance_ingestion_pipeline(
     props: ArrowBatchProps,
+    batch_period: std::time::Duration,
     // object_store: Box<dyn ObjectStore>, // this should probably be some sort of lance or gcp props or something
 ) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinSet)> {
     let now = Utc::now();
-    let rotator = TemporalRotator::try_new(&props, now)?;
-    configure_pipeline(props, rotator)
-}
+    let mut rotator = TemporalRotator::new(&props, now, batch_period)?;
 
-#[allow(dead_code)]
-pub async fn lance_ingestion_pipeline_with_duration(
-    props: ArrowBatchProps,
-    rotation_duration_seconds: i64,
-) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinSet)> {
-    let now = Utc::now();
-    let rotator = TemporalRotator::try_new_with_duration(&props, now, rotation_duration_seconds)?;
-    configure_pipeline(props, rotator)
-}
-
-fn configure_pipeline(
-    props: ArrowBatchProps,
-    mut rotator: TemporalRotator,
-) -> Result<(UnboundedSender<DynamicMessage>, LoopJoinSet)> {
     let (head, mut rx_msg) = unbounded_channel();
     let (tx_buffer, mut rx_buffer) = unbounded_channel();
     let now = Utc::now();
@@ -202,7 +186,7 @@ mod tests {
         let arrow_props = timestamp_encoding_props();
         let descriptor = arrow_props.descriptor.clone();
 
-        let (head, mut tasks) = lance_ingestion_pipeline_with_duration(arrow_props, 5)
+        let (head, mut tasks) = lance_ingestion_pipeline(arrow_props, Duration::from_millis(5))
             .await
             .unwrap();
 
