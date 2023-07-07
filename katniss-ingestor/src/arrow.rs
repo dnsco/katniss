@@ -35,11 +35,12 @@ impl ProtobufBatchIngestor {
         Ok(records)
     }
 
+    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.converter.len()
     }
 
-    #[must_use]
+    #[allow(unused)]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

@@ -15,6 +15,5 @@ katniss-ingestor = { version = "0.0.3", path = "../katniss-ingestor" }
 arrow-array.workspace = true
 arrow-schema.workspace = true
 object_store.workspace = true
-parquet.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true

@@ -3,7 +3,6 @@
 //!
 
 mod errors;
-pub mod proto_repeated_consumer;
 mod record_conversion;
 mod schema_conversion;
 
@@ -23,6 +22,10 @@ pub mod exports {
     pub use prost_reflect::DynamicMessage;
 }
 
+/// Holds an Arrow Schema and a Protobuf Message Descriptor
+/// Has all meta data necessary for converting between a bunch of protos to
+/// an Arrow Record Batch
+/// Dictionaries are stored seperately so that they can be mapped correctly in Arrow
 pub struct ArrowBatchProps {
     pub schema: Arc<Schema>,
     pub dictionaries: Arc<DictValuesContainer>,
@@ -32,7 +35,8 @@ pub struct ArrowBatchProps {
 
 impl ArrowBatchProps {
     pub fn try_new(pool: DescriptorPool, msg_name: String) -> Result<Self> {
-        let converter = SchemaConverter::new(pool);
+        let converter: SchemaConverter = SchemaConverter::new(pool);
+
         let (schema_opt, dictionaries_opt) =
             converter.get_arrow_schema_with_dictionaries(&msg_name, &[])?;
 

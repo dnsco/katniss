@@ -1,10 +1,11 @@
-use std::{any::type_name, path::PathBuf};
+use std::{any::type_name, path::PathBuf, time::Duration};
 
 use anyhow::Result;
-use katniss_ingestor::parquet::MultiBatchWriter;
+use chrono::Utc;
 use prost::Message;
 use prost_reflect::DynamicMessage;
 
+use katniss_ingestor::{LanceIngestor, TemporalBuffer};
 use katniss_pb2arrow::{exports::RecordBatch, ArrowBatchProps, RecordConverter};
 
 use crate::{descriptor_pool, schema_converter};
@@ -67,14 +68,21 @@ fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
     type_name::<T>()
 }
 
-pub fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
+pub async fn write_batch(batch: RecordBatch, test_name: &str) -> anyhow::Result<()> {
+    let now = Utc::now();
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("data");
     path.push("tests");
     path.push(test_name);
+    path.push(now.to_rfc2822());
     std::fs::create_dir_all(&path)?;
 
-    let mut writer = MultiBatchWriter::new(path, batch.schema(), 1)?;
-    writer.write_batch(batch)?;
+    let ingestor = LanceIngestor::new(path.as_os_str().to_str().unwrap(), batch.schema())?;
+
+    let mut buffer = TemporalBuffer::new(now, Duration::from_secs(1))?;
+    buffer.batches = vec![batch];
+
+    ingestor.write(buffer).await?;
+
     Ok(())
 }

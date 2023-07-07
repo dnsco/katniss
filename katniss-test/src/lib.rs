@@ -8,7 +8,19 @@ pub mod protos {
         include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
 
     pub mod spacecorp {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
         include!(concat!(env!("OUT_DIR"), "/eto.pb2arrow.tests.spacecorp.rs"));
+
+        impl Timestamp {
+            pub fn system_now() -> Self {
+                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                Self {
+                    seconds: now.as_secs() as i64,
+                    nanos: now.subsec_nanos() as i32,
+                }
+            }
+        }
     }
 
     pub mod v2 {
