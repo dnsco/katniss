@@ -110,6 +110,7 @@ mod tests {
     use std::sync::atomic::AtomicI64;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+    use chrono::DateTime;
     use tokio::{select, spawn, task::yield_now};
 
     use katniss_pb2arrow::exports::prost_reflect::prost::Message;
@@ -160,19 +161,29 @@ mod tests {
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 3);
 
-        let batch =
-            ProtoBatch::SpaceCorp(&[Timestamp::default(), Timestamp::default()]).arrow_batch()?;
-
-        let buffer: TemporalBuffer = TemporalBuffer {
-            begin_at: Utc::now(),
-            end_at: Utc::now(),
-            batches: vec![batch],
-        }; // make temporal buffer here, that will record arrow record batches
-
+        let protos = &[Timestamp::default(), Timestamp::default()];
+        let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 5);
 
+        let protos = &[Timestamp::default()];
+        let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
+        let dataset = ingestor.write(buffer).await?;
+        assert_eq!(dataset.count_rows().await?, 6);
+
         Ok(())
+    }
+
+    fn temporal_buffer<'a, T: Message>(
+        protos: ProtoBatch<'a, T>,
+        begin_at: DateTime<Utc>,
+        end_at: DateTime<Utc>,
+    ) -> anyhow::Result<TemporalBuffer> {
+        Ok(TemporalBuffer {
+            begin_at,
+            end_at,
+            batches: vec![protos.arrow_batch()?],
+        })
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
