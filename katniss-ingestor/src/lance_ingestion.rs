@@ -111,6 +111,7 @@ mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use chrono::DateTime;
+    use katniss_test::protos::spacecorp::{packet, Packet};
     use tokio::{select, spawn, task::yield_now};
 
     use katniss_pb2arrow::exports::prost_reflect::prost::Message;
@@ -140,9 +141,9 @@ mod tests {
 
         // does this batch's structure mean we can eject ArrowProps?  currently not in use.
         let batch = ProtoBatch::SpaceCorp(&[
-            JumpDriveStatus::default(),
-            JumpDriveStatus::default(),
-            JumpDriveStatus::default(),
+            packet_with_nested_inner_enum_field(),
+            packet_with_nested_inner_enum_field(),
+            packet_with_nested_inner_enum_field(),
         ])
         .arrow_batch()?;
 
@@ -162,12 +163,15 @@ mod tests {
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 3);
 
-        let protos = &[JumpDriveStatus::default(), JumpDriveStatus::default()];
+        let protos = &[
+            packet_with_nested_inner_enum_field(),
+            packet_with_nested_inner_enum_field(),
+        ];
         let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 5);
 
-        let protos = &[JumpDriveStatus::default()];
+        let protos = &[packet_with_nested_inner_enum_field()];
         let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 6);
@@ -263,5 +267,12 @@ mod tests {
         }
 
         false
+    }
+
+    fn packet_with_nested_inner_enum_field() -> Packet {
+        Packet {
+            msg: Some(packet::Msg::JumpDriveStatus(JumpDriveStatus::default())),
+            ..Default::default()
+        }
     }
 }
