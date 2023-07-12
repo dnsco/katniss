@@ -165,13 +165,17 @@ mod tests {
 
         let protos = &[
             packet_with_nested_inner_enum_field(),
-            packet_with_nested_inner_enum_field(),
+            dbg!(packet_with_nested_inner_enum_field()),
         ];
         let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 5);
 
-        let protos = &[packet_with_nested_inner_enum_field()];
+        let protos: &[Packet] = &[];
+        let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
+        ingestor.write(buffer).await?;
+
+        let protos = &[Packet::default()];
         let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 6);

@@ -41,10 +41,13 @@ impl<'a, T: Message> ProtoBatch<'a, T> {
             Self::SpaceCorp(_) => "eto.pb2arrow.tests.spacecorp",
         };
 
-        let message_name = type_name_of_val(&self.messages()[0])
+        let name_with_trailing_array_bracket = type_name_of_val(&self.messages())
             .split("::")
             .last()
             .unwrap();
+
+        let message_name =
+            &name_with_trailing_array_bracket[..name_with_trailing_array_bracket.len() - 1];
 
         format!("{package_name}.{message_name}")
     }
