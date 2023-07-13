@@ -44,7 +44,7 @@ message JumpDriveStatus {
     GalacticCoordinate target = 1;
     JumpDriveMode mode = 2;
     repeated QuantumSpaceTimeReading history = 3;
-    uint64 powered_time_secs = 4;
+    int32 powered_time_secs = 4;
 }
 
 enum JumpDriveMode {
