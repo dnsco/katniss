@@ -110,18 +110,21 @@ mod tests {
     use std::sync::atomic::AtomicI64;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+    use chrono::DateTime;
+    use katniss_test::protos::spacecorp::{packet, Packet};
     use tokio::{select, spawn, task::yield_now};
 
     use katniss_pb2arrow::exports::prost_reflect::prost::Message;
-    use katniss_test::{descriptor_pool, protos::spacecorp::Timestamp, test_util::ProtoBatch};
+    use katniss_test::{
+        descriptor_pool, protos::spacecorp::JumpDriveStatus, test_util::ProtoBatch,
+    };
 
     use crate::temporal_rotator::timestamp_string;
 
     use super::*;
 
-    fn timestamp_encoding_props() -> ArrowBatchProps {
+    fn encoding_props(msg_name: &'static str) -> ArrowBatchProps {
         let pool = descriptor_pool().unwrap();
-        let msg_name = "eto.pb2arrow.tests.spacecorp.Timestamp";
         ArrowBatchProps::try_new(pool, msg_name.to_string()).unwrap()
     }
 
@@ -138,9 +141,9 @@ mod tests {
 
         // does this batch's structure mean we can eject ArrowProps?  currently not in use.
         let batch = ProtoBatch::SpaceCorp(&[
-            Timestamp::default(),
-            Timestamp::default(),
-            Timestamp::default(),
+            packet_with_nested_inner_enum_field(),
+            packet_with_nested_inner_enum_field(),
+            packet_with_nested_inner_enum_field(),
         ])
         .arrow_batch()?;
 
@@ -160,19 +163,36 @@ mod tests {
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 3);
 
-        let batch =
-            ProtoBatch::SpaceCorp(&[Timestamp::default(), Timestamp::default()]).arrow_batch()?;
-
-        let buffer: TemporalBuffer = TemporalBuffer {
-            begin_at: Utc::now(),
-            end_at: Utc::now(),
-            batches: vec![batch],
-        }; // make temporal buffer here, that will record arrow record batches
-
+        let protos = &[
+            packet_with_nested_inner_enum_field(),
+            dbg!(packet_with_nested_inner_enum_field()),
+        ];
+        let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 5);
 
+        let protos: &[Packet] = &[];
+        let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
+        ingestor.write(buffer).await?;
+
+        let protos = &[Packet::default()];
+        let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
+        let dataset = ingestor.write(buffer).await?;
+        assert_eq!(dataset.count_rows().await?, 6);
+
         Ok(())
+    }
+
+    fn temporal_buffer<T: Message>(
+        protos: ProtoBatch<'_, T>,
+        begin_at: DateTime<Utc>,
+        end_at: DateTime<Utc>,
+    ) -> anyhow::Result<TemporalBuffer> {
+        Ok(TemporalBuffer {
+            begin_at,
+            end_at,
+            batches: vec![protos.arrow_batch()?],
+        })
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
@@ -182,7 +202,7 @@ mod tests {
         // drop the pipeline (we currently drop data that hasn't ended temporal window and we don't want to do that)
         // read lance from like filesystem or something and assert it has the number of records
 
-        let arrow_props = timestamp_encoding_props();
+        let arrow_props = encoding_props("eto.pb2arrow.tests.spacecorp.JumpDriveStatus");
         let descriptor = arrow_props.descriptor.clone();
         let now = Utc::now();
         let timestamp = timestamp_string(now);
@@ -202,7 +222,7 @@ mod tests {
             loop {
                 let msg = DynamicMessage::decode(
                     descriptor.clone(),
-                    &Timestamp::system_now().encode_to_vec()[..],
+                    &JumpDriveStatus::default().encode_to_vec()[..],
                 )
                 .unwrap();
                 head.send(msg).unwrap();
@@ -250,6 +270,13 @@ mod tests {
             }
         }
 
-        return false;
+        false
+    }
+
+    fn packet_with_nested_inner_enum_field() -> Packet {
+        Packet {
+            msg: Some(packet::Msg::JumpDriveStatus(JumpDriveStatus::default())),
+            ..Default::default()
+        }
     }
 }
