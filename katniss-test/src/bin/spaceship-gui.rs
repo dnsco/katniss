@@ -1,33 +1,57 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+
+use chrono::Utc;
+use slint::Weak;
 
 use katniss_test::protos::spacecorp::JumpDriveStatus;
 
+async fn run_jumpdrive(status: Arc<Mutex<JumpDriveStatus>>) {
+    let mut start = Utc::now();
+    loop {
+        let now = Utc::now();
+        if (now - start) > chrono::Duration::seconds(1) {
+            start = Utc::now();
+            let mut status = status.lock().unwrap();
+            status.powered_time_secs += 1;
+            dbg!(status.powered_time_secs);
+        }
+    }
+}
+
+async fn update_gui(weak_window: Weak<MainWindow>, status: Arc<Mutex<JumpDriveStatus>>) {
+    loop {
+        let powered_time_secs = status.lock().unwrap().powered_time_secs.clone();
+        weak_window
+            .upgrade_in_event_loop(move |window| {
+                window.set_powered_time_secs(powered_time_secs);
+            })
+            .unwrap();
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let status = Arc::new(Mutex::new(JumpDriveStatus::default()));
-
-    let main_window = MainWindow::new().unwrap();
-    main_window.set_powered_time_secs(status.lock().unwrap().powered_time_secs);
-    main_window.run().unwrap();
-
-    let sim_status = status.clone();
-    thread::spawn(move || loop {
-        let mut status = sim_status.lock().unwrap();
-        status.powered_time_secs += 1;
-        dbg!(status.powered_time_secs);
-        //drops here
-        thread::sleep(Duration::from_secs(1));
-    });
+    let window = MainWindow::new().unwrap();
+    window.set_powered_time_secs(status.lock().unwrap().powered_time_secs);
 
     let gui_status = status.clone();
-    thread::spawn(move || dbg!(gui_status.lock().unwrap().powered_time_secs));
+    let weak_window = window.as_weak();
+    thread::spawn(move || {
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(update_gui(weak_window, gui_status))
+    });
 
-    thread::sleep(Duration::from_secs(3));
-    dbg!(status.lock().unwrap().powered_time_secs);
+    let sim_status = status.clone();
+    thread::spawn(move || {
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(run_jumpdrive(sim_status))
+    });
 
-    // do slint stuff here
+    window.run().unwrap();
 
     Ok(())
 }
