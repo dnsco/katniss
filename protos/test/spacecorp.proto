@@ -45,6 +45,7 @@ message JumpDriveStatus {
     JumpDriveMode mode = 2;
     repeated QuantumSpaceTimeReading history = 3;
     int32 powered_time_secs = 4;
+    int32 temperature = 5;
 }
 
 enum JumpDriveMode {
