@@ -4,8 +4,8 @@ import { HyperdriveConsole } from "hyperdrive_console.slint";
 import { VerticalVolume } from "vertical_volume.slint";
 
 export component MainWindow inherits Window {
-    width: 800px;
-    height: 600px;
+    width: 1080px;
+    height: 960px;
     callback power_clicked;
 
     in property <int> mode;
@@ -14,28 +14,58 @@ export component MainWindow inherits Window {
 
     background: black;
 
-    VerticalBox {
-        DebugBox {
-            powered-time-secs: powered-time-secs;
-            mode: mode;
-        }
-        HorizontalBox {
-            VerticalVolume {
-                value: temperature;
-                ceiling: 100;
-                max-bars: 10;
-                bar-height: 3px;
-                bar-spacing: 3px;
-                background: #111111;
-                bar-color: #eeeeee;
-                inert-bar-color: #333333;
-                width: 50px;
+    HorizontalBox {
+        VerticalBox {
+            width: 540px;
+
+            HyperdriveConsole {
+                power-clicked => {root.power-clicked()}
+                powered-time-secs: powered-time-secs;
+                mode: mode;
+            }
+            HorizontalBox {
+                VerticalVolume {
+                    value: temperature;
+                    ceiling: 100;
+                    max-bars: 10;
+                    bar-height: 3px;
+                    bar-spacing: 3px;
+                    background: #111111;
+                    bar-color: #eeeeee;
+                    inert-bar-color: #333333;
+                    width: 50px;
+                }
             }
         }
-        HyperdriveConsole {
-            power-clicked => {root.power-clicked()}
-            powered-time-secs: powered-time-secs;
-            mode: mode;
+        VerticalBox {
+            width: 540px;
+            Rectangle {
+                background: #444;
+                VerticalBox {
+                    DebugBox {
+                        powered-time-secs: powered-time-secs;
+                        mode: mode;
+                    }
+                    Rectangle {
+                        background: lightgrey;
+                        callback power_clicked;
+                
+                        width: 96px;
+                        height: 96px;
+                        border-radius: self.width / 2; // make rectangle a circle
+                
+                        Text {
+                            text: "Power";
+                            color: black;
+                        }
+                        TouchArea {
+                            clicked => {
+                                root.power-clicked();
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

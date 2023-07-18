@@ -8,29 +8,13 @@ export component HyperdriveConsole inherits HorizontalBox {
     // https://slint.dev/releases/1.1.1/docs/slint/src/reference/callbacks
     callback power_clicked;
     
-
-    Rectangle {
-        background: lightgrey;
-        callback power_clicked;
-
-        width: 96px;
-        height: 96px;
-        border-radius: self.width / 2; // make rectangle a circle
-
-        Text {
-            text: "Power";
-            color: black;
-        }
-        TouchArea {
-            clicked => {
-                root.power-clicked();
-            }
-        }
-    }
     Rectangle {
         animate background {
-        duration: 500ms;
+            duration: 500ms;
         }
+        height: 100px;
+        width: 100px;
+        border-radius: self.width / 2;
 
         states [
                 off when mode == 0: {
@@ -43,10 +27,10 @@ export component HyperdriveConsole inherits HorizontalBox {
                     background: green;
                 }
             ]
-            
+
         Text {
             text: mode;
-            font-size: 24px;
+            font-size: 16px;
             color: black;
 
             states [
