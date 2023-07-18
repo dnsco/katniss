@@ -1,0 +1,16 @@
+import { VerticalBox , HorizontalBox} from "std-widgets.slint";
+
+export component VerticalVolume inherits Rectangle {
+        in property <int> bar-count;
+        in property <length> bar-height;
+        in property <length> bar-spacing;
+        in property <color> bar-color;
+
+        VerticalBox {
+                spacing: bar_spacing;
+                for i in bar_count : Rectangle {
+                        background: bar-color;
+                        height: bar-height;
+                }
+        }
+}

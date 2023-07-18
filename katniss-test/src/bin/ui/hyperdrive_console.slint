@@ -10,15 +10,16 @@ export component HyperdriveConsole inherits HorizontalBox {
     
 
     Rectangle {
-        background: black;
+        background: lightgrey;
         callback power_clicked;
 
         width: 96px;
         height: 96px;
-        border-radius: self.width/2;
+        border-radius: self.width / 2; // make rectangle a circle
 
         Text {
             text: "Power";
+            color: black;
         }
         TouchArea {
             clicked => {
@@ -42,27 +43,23 @@ export component HyperdriveConsole inherits HorizontalBox {
                     background: green;
                 }
             ]
-        Rectangle {
-            background: black;
-            height: 48px;
-            width: 128px;
+            
+        Text {
+            text: mode;
+            font-size: 24px;
+            color: black;
 
-            Text {
-                text: mode;
-                font-size: 24px;
-
-                states [
-                    off when mode == 0: {
-                        text: "Hyperdrive Offline";
-                    }
-                    warming when mode == 1: {
-                        text: "Hyperdrive Warming";
-                    }
-                    engaged when mode >= 2: {
-                        text: "Hyperdrive Engaged";
-                    }
-                ]
-            }
+            states [
+                off when mode == 0: {
+                    text: "Offline";
+                }
+                warming when mode == 1: {
+                    text: "Warming";
+                }
+                engaged when mode >= 2: {
+                    text: "Engaged";
+                }
+            ]
         }
     }
 }
