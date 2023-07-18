@@ -1,16 +1,13 @@
-import { VerticalBox , HorizontalBox} from "std-widgets.slint";
-import { DebugBox } from "debug.slint";
-import { HyperdriveConsole } from "hyperdrive_console.slint";
+import { VerticalBox , HorizontalBox, Slider, SpinBox} from "std-widgets.slint";
 import { VerticalVolume } from "vertical_volume.slint";
 
 export component MainWindow inherits Window {
-    width: 1080px;
+    width: 540px;
     height: 960px;
-    callback power_clicked;
+    callback temperature_changed(float);
 
-    in property <int> mode;
-    in property <int> powered_time_secs;
     in property <int> temperature;
+    in property <int> temperature_ceiling;
 
     background: black;
 
@@ -19,15 +16,10 @@ export component MainWindow inherits Window {
             width: 540px;
             alignment: end;
 
-            // HyperdriveConsole {
-            //     power-clicked => {root.power-clicked()}
-            //     powered-time-secs: powered-time-secs;
-            //     mode: mode;
-            // }
             HorizontalBox {
                 VerticalVolume {
                     value: temperature;
-                    ceiling: 100;
+                    ceiling: temperature_ceiling;
                     bar-height: 4px;
                     bar-spacing: 4px;
                     background: black;
@@ -37,34 +29,14 @@ export component MainWindow inherits Window {
                     height: 800px;
                 }
             }
-        }
-        VerticalBox {
-            width: 540px;
-            Rectangle {
-                background: #444;
-                VerticalBox {
-                    DebugBox {
-                        powered-time-secs: powered-time-secs;
-                        mode: mode;
-                    }
-                    Rectangle {
-                        background: lightgrey;
-                        callback power_clicked;
-                
-                        width: 96px;
-                        height: 96px;
-                        border-radius: self.width / 2; // make rectangle a circle
-                
-                        Text {
-                            text: "Power";
-                            color: black;
-                        }
-                        TouchArea {
-                            clicked => {
-                                root.power-clicked();
-                            }
-                        }
-                    }
+            Slider {
+                width: 500px;
+                value: 0;
+                minimum: 0;
+                maximum: temperature_ceiling;
+
+                changed(change) => {
+                    root.temperature-changed(change);
                 }
             }
         }

@@ -15,7 +15,7 @@ export component VerticalVolume inherits Rectangle {
         }
 
         // this needs to be nudged a bit, we're either have a rounding error or
-        // are failing to account for something like padding or alignment or something
+        // are failing to account for something like padding or alignment
         // looks like the delta is the height of ~2 bars
         function calc_max_bars() -> int {
                 self.height / (self.bar-height + self.bar-spacing) - 2;
@@ -26,12 +26,11 @@ export component VerticalVolume inherits Rectangle {
                  // align end so active-bars stack from the bottom-up
                 alignment: end;
 
-                // draw inert bars
+                // draw inert bars, then active bars
                 for i in (calc_max_bars() - calculate_active_bars()) : Rectangle {
                         background: inert-bar-color;
                         height: bar-height;
                 }
-                // draw active bars
                 for i in calculate_active_bars() : Rectangle {
                         background: bar-color;
                         height: bar-height;

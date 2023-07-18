@@ -2,69 +2,44 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use chrono::Utc;
 use slint::Weak;
 
 use katniss_test::protos::spacecorp::JumpDriveStatus;
 
 slint::include_modules!();
 
-fn start_jumpdrive(status: Arc<Mutex<JumpDriveStatus>>) {
+// TODO!
+// #1
+// change temperature concept to have a desired and actual values
+// dig up the old power_times_sec increment code and re-purpose to
+// simulate closing the delta between actual and desired
+//
+// #2
+//  Figure out why the gui launches with wrong scaling and corrects
+//
+// #3
+//  See what it takes to make gui scale to different display dimensions
+//
+// #4
+//  Extract panel/quadrant from main window so we can see what it's
+// like to more than one
+//
+// #5
+// See about making a knob sim, slider works ok for demo though.
+
+const TEMPERATURE_CEILING: i32 = 1000;
+
+fn set_jumpdrive_temperature(status: Arc<Mutex<JumpDriveStatus>>, new_temp: i32) {
     let mut status = status.lock().unwrap();
-
-    match status.mode {
-        0 => status.mode = 1,
-        _ => {
-            status.mode = 0;
-            status.powered_time_secs = 0;
-        }
-    }
+    status.temperature = new_temp;
 }
 
-async fn jumpdrive_tick(status: Arc<Mutex<JumpDriveStatus>>) {
-    let mut tick_start = Utc::now();
+async fn gui_tick(weak_window: Weak<MainWindow>, status: Arc<Mutex<JumpDriveStatus>>) {
     loop {
-        let now = Utc::now();
-        if now - tick_start > chrono::Duration::seconds(1) {
-            tick_start = now;
-
-            // accessing the arc mutex directly in match locks up the threads
-            let mode = status.lock().unwrap().mode.clone();
-
-            match mode {
-                1 => {
-                    status.lock().unwrap().powered_time_secs += 1;
-                    if status.lock().unwrap().powered_time_secs > 5 {
-                        status.lock().unwrap().mode = 2;
-                    }
-                }
-                2 => status.lock().unwrap().powered_time_secs += 1,
-                _ => {}
-            }
-
-            update_jumpdrive_temperature(status.clone());
-        }
-    }
-}
-
-fn update_jumpdrive_temperature(status: Arc<Mutex<JumpDriveStatus>>) {
-    dbg!(status.lock().unwrap().temperature);
-    let powered_time_secs = status.lock().unwrap().powered_time_secs;
-
-    // fake logarithm
-    status.lock().unwrap().temperature = powered_time_secs * 3;
-}
-
-async fn update_gui(weak_window: Weak<MainWindow>, status: Arc<Mutex<JumpDriveStatus>>) {
-    loop {
-        let mode: i32 = status.lock().unwrap().mode.clone();
-        let powered_time_secs = status.lock().unwrap().powered_time_secs.clone();
         let temperature = status.lock().unwrap().temperature.clone();
         weak_window
             .upgrade_in_event_loop(move |window| {
-                window.set_powered_time_secs(powered_time_secs);
                 window.set_temperature(temperature);
-                window.set_mode(mode);
             })
             .unwrap();
     }
@@ -76,23 +51,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let weak_window: Weak<MainWindow> = window.as_weak();
     let gui_status = status.clone();
-    let sim_status = status.clone();
+    let slider_control_status = status.clone();
+
+    window.set_temperature_ceiling(TEMPERATURE_CEILING);
 
     thread::spawn(move || {
         tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(update_gui(weak_window, gui_status))
+            .block_on(gui_tick(weak_window, gui_status))
     });
 
-    thread::spawn(move || {
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(jumpdrive_tick(sim_status))
-    });
-
-    window.on_power_clicked(move || {
-        let control_status = status.clone();
-        start_jumpdrive(control_status);
+    window.on_temperature_changed(move |change| {
+        dbg!(change);
+        set_jumpdrive_temperature(slider_control_status.clone(), change as i32);
     });
 
     window.run().unwrap();
