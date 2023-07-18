@@ -78,10 +78,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             .block_on(jumpdrive_tick(sim_status))
     });
 
-    window.on_clicked(move || {
+    window.on_power_clicked(move || {
         let control_status = status.clone();
         start_jumpdrive(control_status);
     });
+
     window.run().unwrap();
 
     Ok(())
