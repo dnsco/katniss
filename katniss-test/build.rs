@@ -13,5 +13,8 @@ fn main() -> Result<()> {
             &["spacecorp.proto", "version_2.proto", "version_3.proto"],
             &["../protos/test"],
         )?;
+
+    slint_build::compile("src/bin/ui/main.slint").unwrap();
+
     Ok(())
 }

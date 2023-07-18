@@ -1,0 +1,87 @@
+
+import { VerticalBox , HorizontalBox} from "std-widgets.slint";
+export component MainWindow inherits Window {
+    width: 800px;
+    height: 600px;
+    callback clicked;
+
+    in property <int> powered_time_secs;
+    in property <int> mode;
+
+    VerticalBox {
+        Text {
+            text: "Jumpdrive Status";
+            font-size: 24px;
+        }
+
+        HorizontalBox {
+            Text {
+                    text: powered_time_secs;
+                    font-size: 24px;
+                }
+        }
+
+        HorizontalBox {
+            Rectangle {
+                background: black;
+                callback clicked;
+
+                width: 96px;
+                height: 96px;
+                border-radius: self.width/2;
+
+                Text {
+                    text: "Power";
+                }
+                TouchArea {
+                    clicked => {
+                        // pretty sure "root" refers to the root of the current slint "file",
+                        // not necessarily the outermost element.
+                        root.clicked();
+                    }
+                }
+            }
+            Rectangle {
+                animate background {
+                duration: 500ms;
+                }
+
+                states [
+                        off when mode == 0: {
+                            background: grey;
+                        }
+                        warming when mode == 1: {
+                            background: yellow;
+                        }
+                        engaged when mode >= 2: {
+                            background: green;
+                        }
+                    ]
+                Rectangle {
+                    background: black;
+                    height: 48px;
+                    width: 128px;
+
+                    Text {
+                        text: mode;
+                        font-size: 24px;
+
+                        states [
+                            off when mode == 0: {
+                                text: "Hyperdrive Offline";
+                            }
+                            warming when mode == 1: {
+                                text: "Hyperdrive Warming";
+                            }
+                            engaged when mode >= 2: {
+                                text: "Hyperdrive Engaged";
+                            }
+                        ]
+
+                    }
+                }
+            }
+        }
+    }
+}
+
