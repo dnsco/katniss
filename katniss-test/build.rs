@@ -14,7 +14,15 @@ fn main() -> Result<()> {
             &["../protos/test"],
         )?;
 
-    slint_build::compile("src/bin/ui/main.slint").unwrap();
+    // "glob" slint ui dir
+    for element in std::path::Path::new("src/bin/ui").read_dir().unwrap() {
+        let path = element.unwrap().path();
+        if let Some(extension) = path.extension() {
+            if extension == "slint" {
+                slint_build::compile(path.to_str().unwrap()).unwrap();
+            }
+        }
+    }
 
     Ok(())
 }
