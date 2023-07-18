@@ -1,20 +1,36 @@
 import { VerticalBox , HorizontalBox} from "std-widgets.slint";
 
 export component VerticalVolume inherits Rectangle {
-        in property <int> bar-count;
         in property <int> max-bars;
         in property <length> bar-height;
         in property <length> bar-spacing;
         in property <color> bar-color;
+        in property <color> inert-bar-color;
+        in property <float> value;
+        // limitation: if value grows larger than ceiling, we never show more than max bars.
+        // is this a correct assumption for a real-life use-case? :)
+        in property <float> ceiling;
+
+        // calculate how many bars are active
+        function calculate_active_bars() -> int {
+                Math.min(value / ceiling * max-bars, max-bars);
+        }
 
         // hack: +2 to max-bars to account for top/bottom padding
         height: (bar-height + (bar-spacing)) * (max-bars + 2);
 
         VerticalBox {
                 spacing: bar_spacing;
+                 // align end so active-bars stack from the bottom -> up
                 alignment: end;
 
-                for i in Math.min(bar-count, max-bars) : Rectangle {
+                // draw inert bars
+                for i in (max-bars - calculate_active_bars()) : Rectangle {
+                        background: inert-bar-color;
+                        height: bar-height;
+                }
+                // draw active bars
+                for i in calculate_active_bars() : Rectangle { // todo remove math.min
                         background: bar-color;
                         height: bar-height;
                 }

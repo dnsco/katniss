@@ -29,7 +29,7 @@ async fn jumpdrive_tick(status: Arc<Mutex<JumpDriveStatus>>) {
             tick_start = now;
 
             // accessing the arc mutex directly in match locks up the threads
-            let mode = status.lock().unwrap().mode;
+            let mode = status.lock().unwrap().mode.clone();
 
             match mode {
                 1 => {
@@ -41,17 +41,29 @@ async fn jumpdrive_tick(status: Arc<Mutex<JumpDriveStatus>>) {
                 2 => status.lock().unwrap().powered_time_secs += 1,
                 _ => {}
             }
+
+            update_jumpdrive_temperature(status.clone());
         }
     }
+}
+
+fn update_jumpdrive_temperature(status: Arc<Mutex<JumpDriveStatus>>) {
+    dbg!(status.lock().unwrap().temperature);
+    let powered_time_secs = status.lock().unwrap().powered_time_secs;
+
+    // fake logarithm
+    status.lock().unwrap().temperature = powered_time_secs * 3;
 }
 
 async fn update_gui(weak_window: Weak<MainWindow>, status: Arc<Mutex<JumpDriveStatus>>) {
     loop {
         let mode: i32 = status.lock().unwrap().mode.clone();
         let powered_time_secs = status.lock().unwrap().powered_time_secs.clone();
+        let temperature = status.lock().unwrap().temperature.clone();
         weak_window
             .upgrade_in_event_loop(move |window| {
                 window.set_powered_time_secs(powered_time_secs);
+                window.set_temperature(temperature);
                 window.set_mode(mode);
             })
             .unwrap();

@@ -1,4 +1,3 @@
-
 import { VerticalBox , HorizontalBox} from "std-widgets.slint";
 import { DebugBox } from "debug.slint";
 import { HyperdriveConsole } from "hyperdrive_console.slint";
@@ -11,6 +10,7 @@ export component MainWindow inherits Window {
 
     in property <int> mode;
     in property <int> powered_time_secs;
+    in property <int> temperature;
 
     background: black;
 
@@ -19,14 +19,18 @@ export component MainWindow inherits Window {
             powered-time-secs: powered-time-secs;
             mode: mode;
         }
-        VerticalVolume {
-            bar-count: powered-time-secs;
-            max-bars: 10;
-            bar-height: 3px;
-            bar-spacing: 3px;
-            background: black;
-            bar-color: lightgrey;
-            width: 50px;
+        HorizontalBox {
+            VerticalVolume {
+                value: temperature;
+                ceiling: 100;
+                max-bars: 10;
+                bar-height: 3px;
+                bar-spacing: 3px;
+                background: #111111;
+                bar-color: #eeeeee;
+                inert-bar-color: #333333;
+                width: 50px;
+            }
         }
         HyperdriveConsole {
             power-clicked => {root.power-clicked()}
