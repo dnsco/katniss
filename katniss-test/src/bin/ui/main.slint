@@ -1,5 +1,8 @@
 
 import { VerticalBox , HorizontalBox} from "std-widgets.slint";
+import { DebugBox
+} from "debug.slint";
+
 export component MainWindow inherits Window {
     width: 800px;
     height: 600px;
@@ -9,16 +12,9 @@ export component MainWindow inherits Window {
     in property <int> mode;
 
     VerticalBox {
-        Text {
-            text: "Jumpdrive Status";
-            font-size: 24px;
-        }
-
-        HorizontalBox {
-            Text {
-                    text: powered_time_secs;
-                    font-size: 24px;
-                }
+        DebugBox {
+            powered-time-secs: powered-time-secs;
+            mode: mode;
         }
 
         HorizontalBox {

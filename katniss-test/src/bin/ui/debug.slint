@@ -1,0 +1,39 @@
+import { VerticalBox , HorizontalBox} from "std-widgets.slint";
+
+export component DebugBox inherits HorizontalBox {
+    in property <int> powered_time_secs;
+    in property <int> mode;
+
+    HorizontalBox {
+        Text {
+            text: "target:";
+        }
+        Text {
+                text: "TODO!";
+            }
+    }
+    HorizontalBox {
+        Text {
+            text: "mode:";
+        }
+        Text {
+                text: mode;
+            }
+    }
+    HorizontalBox {
+        Text {
+            text: "history:";
+        }
+        Text {
+                text: "TODO!";
+            }
+    }
+    HorizontalBox {
+        Text {
+            text: "powered_time_secs:";
+        }
+        Text {
+                text: powered_time_secs;
+            }
+    }
+}
