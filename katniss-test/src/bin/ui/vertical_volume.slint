@@ -2,13 +2,19 @@ import { VerticalBox , HorizontalBox} from "std-widgets.slint";
 
 export component VerticalVolume inherits Rectangle {
         in property <int> bar-count;
+        in property <int> max-bars;
         in property <length> bar-height;
         in property <length> bar-spacing;
         in property <color> bar-color;
 
+        // hack: +2 to max-bars to account for top/bottom padding
+        height: (bar-height + (bar-spacing)) * (max-bars + 2);
+
         VerticalBox {
                 spacing: bar_spacing;
-                for i in bar_count : Rectangle {
+                alignment: end;
+
+                for i in Math.min(bar-count, max-bars) : Rectangle {
                         background: bar-color;
                         height: bar-height;
                 }
