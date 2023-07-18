@@ -17,23 +17,24 @@ export component MainWindow inherits Window {
     HorizontalBox {
         VerticalBox {
             width: 540px;
+            alignment: end;
 
-            HyperdriveConsole {
-                power-clicked => {root.power-clicked()}
-                powered-time-secs: powered-time-secs;
-                mode: mode;
-            }
+            // HyperdriveConsole {
+            //     power-clicked => {root.power-clicked()}
+            //     powered-time-secs: powered-time-secs;
+            //     mode: mode;
+            // }
             HorizontalBox {
                 VerticalVolume {
                     value: temperature;
                     ceiling: 100;
-                    max-bars: 10;
-                    bar-height: 3px;
-                    bar-spacing: 3px;
-                    background: #111111;
+                    bar-height: 4px;
+                    bar-spacing: 4px;
+                    background: black;
                     bar-color: #eeeeee;
-                    inert-bar-color: #333333;
+                    inert-bar-color: #666;
                     width: 50px;
+                    height: 800px;
                 }
             }
         }

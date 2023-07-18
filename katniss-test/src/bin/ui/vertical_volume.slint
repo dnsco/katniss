@@ -1,36 +1,38 @@
 import { VerticalBox , HorizontalBox} from "std-widgets.slint";
 
 export component VerticalVolume inherits Rectangle {
-        in property <int> max-bars;
         in property <length> bar-height;
         in property <length> bar-spacing;
         in property <color> bar-color;
         in property <color> inert-bar-color;
         in property <float> value;
-        // limitation: if value grows larger than ceiling, we never show more than max bars.
-        // is this a correct assumption for a real-life use-case? :)
         in property <float> ceiling;
 
         // calculate how many bars are active
         function calculate_active_bars() -> int {
-                Math.min(value / ceiling * max-bars, max-bars);
+                // Use Math.min to constrain since value could grow beyond ceiling
+                Math.min(value / ceiling * calc_max_bars(), calc_max_bars());
         }
 
-        // hack: +2 to max-bars to account for top/bottom padding
-        height: (bar-height + (bar-spacing)) * (max-bars + 2);
+        // this needs to be nudged a bit, we're either have a rounding error or
+        // are failing to account for something like padding or alignment or something
+        // looks like the delta is the height of ~2 bars
+        function calc_max_bars() -> int {
+                self.height / (self.bar-height + self.bar-spacing) - 2;
+        }
 
         VerticalBox {
                 spacing: bar_spacing;
-                 // align end so active-bars stack from the bottom -> up
+                 // align end so active-bars stack from the bottom-up
                 alignment: end;
 
                 // draw inert bars
-                for i in (max-bars - calculate_active_bars()) : Rectangle {
+                for i in (calc_max_bars() - calculate_active_bars()) : Rectangle {
                         background: inert-bar-color;
                         height: bar-height;
                 }
                 // draw active bars
-                for i in calculate_active_bars() : Rectangle { // todo remove math.min
+                for i in calculate_active_bars() : Rectangle {
                         background: bar-color;
                         height: bar-height;
                 }
