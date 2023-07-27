@@ -97,8 +97,12 @@ impl LanceIngestor {
         let reader =
             RecordBatchIterator::new(buffer.batches.into_iter().map(Ok), self.schema.clone());
 
-        let dataset =
-            Dataset::write(reader, self.storage_uri.as_ref(), Some(self.write_params)).await?;
+        let dataset = Dataset::write(
+            reader,
+            self.storage_uri.as_ref(),
+            Some(self.write_params.clone()),
+        )
+        .await?;
 
         Ok(dataset)
     }
