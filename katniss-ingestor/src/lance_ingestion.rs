@@ -143,7 +143,6 @@ mod tests {
             .as_micros()
             .to_string();
 
-        // does this batch's structure mean we can eject ArrowProps?  currently not in use.
         let batch = ProtoBatch::SpaceCorp(&[
             packet_with_nested_inner_enum_field(),
             packet_with_nested_inner_enum_field(),
@@ -167,13 +166,10 @@ mod tests {
         let dataset = ingestor.write(buffer).await?;
         assert_eq!(dataset.count_rows().await?, 3);
 
-        let protos = &[
-            packet_with_nested_inner_enum_field(),
-            dbg!(packet_with_nested_inner_enum_field()),
-        ];
+        let protos = &[packet_with_nested_inner_enum_field()];
         let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
-        assert_eq!(dataset.count_rows().await?, 5);
+        assert_eq!(dataset.count_rows().await?, 4);
 
         let protos: &[Packet] = &[];
         let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
@@ -182,7 +178,7 @@ mod tests {
         let protos = &[Packet::default()];
         let buffer = temporal_buffer(ProtoBatch::SpaceCorp(protos), Utc::now(), Utc::now())?;
         let dataset = ingestor.write(buffer).await?;
-        assert_eq!(dataset.count_rows().await?, 6);
+        assert_eq!(dataset.count_rows().await?, 5);
 
         Ok(())
     }
@@ -235,10 +231,6 @@ mod tests {
                 yield_now().await
             }
         });
-
-        //TODO: Make temporal rotator take a time scale (currently hardcoded to 1 minute, make it be perhaps 5ms for test?)
-        // after timeframe of test has been reduced to a minute we should be writing to file system
-        // we can then make write location configurable
 
         // Wait 10 milliseconds for pipeline to do pipeline stuff
         select! {
