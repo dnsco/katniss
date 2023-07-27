@@ -242,7 +242,7 @@ mod tests {
 
         // Wait 10 milliseconds for pipeline to do pipeline stuff
         select! {
-            () = tokio::time::sleep(Duration::from_millis(10)) => (),
+            () = tokio::time::sleep(Duration::from_millis(100)) => (),
             _ = tasks.join_next() => (),
         };
 
