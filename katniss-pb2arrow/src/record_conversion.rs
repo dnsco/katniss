@@ -17,16 +17,21 @@ mod builder_creation;
 pub struct RecordConverter {
     pub(crate) schema: SchemaRef,
     builder: StructBuilder, // fields align with schema
+    factory: BuilderFactory,
+    props: ArrowBatchProps,
 }
 
 impl RecordConverter {
     pub fn try_new(props: &ArrowBatchProps) -> Result<Self> {
         let batch_size = props.records_per_arrow_batch;
-        let factory = BuilderFactory::new_with_dictionary(props.dictionaries.clone());
+        let factory: BuilderFactory =
+            BuilderFactory::new_with_dictionary(props.dictionaries.clone());
         let builder = factory.try_from_fields(props.schema.fields().to_owned(), batch_size)?;
         Ok(Self {
             schema: props.schema.clone(),
             builder,
+            factory,
+            props: props.clone(),
         })
     }
 
@@ -36,9 +41,19 @@ impl RecordConverter {
     }
 
     /// Returns record batch and resets the builder
-    pub fn records(&mut self) -> RecordBatch {
+    pub fn records(&mut self) -> Result<RecordBatch> {
         let struct_array = self.builder.finish();
-        RecordBatch::from(&struct_array)
+        self.builder = self
+            .factory
+            .try_from_fields(
+                self.props.schema.fields().to_owned(),
+                self.props.records_per_arrow_batch,
+            )
+            .unwrap();
+
+        Ok(RecordBatch::from(&struct_array)
+            .with_schema(self.schema.clone())
+            .unwrap())
     }
 
     /// Number of rows in this batch so far

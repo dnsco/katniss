@@ -31,7 +31,7 @@ impl<'a, T: Message> ProtoBatch<'a, T> {
             converter.append_message(&to_dynamic(m, msg_name)?)?;
         }
 
-        Ok(converter.records())
+        Ok(converter.records()?)
     }
 
     fn msg_name(&self) -> String {

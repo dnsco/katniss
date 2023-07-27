@@ -26,6 +26,7 @@ pub mod exports {
 /// Has all meta data necessary for converting between a bunch of protos to
 /// an Arrow Record Batch
 /// Dictionaries are stored seperately so that they can be mapped correctly in Arrow
+#[derive(Clone)]
 pub struct ArrowBatchProps {
     pub schema: Arc<Schema>,
     pub dictionaries: Arc<DictValuesContainer>,

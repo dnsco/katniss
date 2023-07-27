@@ -24,7 +24,7 @@ impl ProtobufBatchIngestor {
         self.converter.append_message(&msg)?;
 
         if self.converter.len() >= self.batch_size {
-            Ok(Some(self.converter.records()))
+            Ok(Some(self.converter.records()?))
         } else {
             Ok(None)
         }
@@ -32,7 +32,7 @@ impl ProtobufBatchIngestor {
 
     pub fn finish(&mut self) -> Result<RecordBatch> {
         let records = self.converter.records();
-        Ok(records)
+        Ok(records?)
     }
 
     #[allow(unused)]
