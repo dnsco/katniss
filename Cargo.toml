@@ -9,6 +9,7 @@ arrow-array = "42.0.0"
 arrow-schema = "42.0.0"
 chrono = "0.4.26"
 clap = { version = "4.3.3", features = ["deprecated", "derive", "env"] }
+futures = "0.3.28"
 itertools = "0.10.5"
 lance = "0.5.10"
 object_store = { version = "0.5.6", features = ["gcp"] }

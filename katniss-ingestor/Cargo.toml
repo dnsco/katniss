@@ -11,6 +11,7 @@ description = "WIP"
 arrow-array.workspace = true
 arrow-schema.workspace = true
 chrono.workspace = true
+futures.workspace = true
 itertools.workspace = true
 lance.workspace = true
 object_store.workspace = true

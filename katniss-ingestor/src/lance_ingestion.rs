@@ -4,7 +4,6 @@ use arrow_array::RecordBatchIterator;
 use arrow_schema::Schema;
 use chrono::Utc;
 use lance::dataset::{Dataset, WriteMode, WriteParams};
-
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
     task::{block_in_place, JoinSet},
@@ -115,17 +114,17 @@ mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use chrono::DateTime;
-    use katniss_test::protos::spacecorp::{packet, Packet};
+    use futures::stream::StreamExt;
     use tokio::{select, spawn, task::yield_now};
 
     use katniss_pb2arrow::exports::prost_reflect::prost::Message;
+    use katniss_test::protos::spacecorp::{packet, Packet};
     use katniss_test::{
         descriptor_pool, protos::spacecorp::JumpDriveStatus, test_util::ProtoBatch,
     };
 
-    use crate::temporal_rotator::timestamp_string;
-
     use super::*;
+    use crate::temporal_rotator::timestamp_string;
 
     fn encoding_props(msg_name: &'static str) -> ArrowBatchProps {
         let pool = descriptor_pool().unwrap();
@@ -232,7 +231,7 @@ mod tests {
             }
         });
 
-        // Wait 10 milliseconds for pipeline to do pipeline stuff
+        // Wait (at least a few more than 2x batch time) milliseconds for pipeline to do pipeline stuff
         select! {
             () = tokio::time::sleep(Duration::from_millis(100)) => (),
             _ = tasks.join_next() => (),
@@ -245,15 +244,20 @@ mod tests {
         block_until_file_exists(manifest_path.to_str().unwrap(), Duration::from_millis(1000));
 
         let dataset = Dataset::open(&storage_uri).await.unwrap();
-        let row_count = dataset.count_rows().await.unwrap() as i32;
-        assert!(row_count > 20); // make a better assertion after cancellation
+        let scanner = dataset.scan();
+        let batches = scanner
+            .try_into_stream()
+            .await
+            .unwrap()
+            .map(|b| b.unwrap())
+            .collect::<Vec<_>>()
+            .await;
 
-        // The current lance Read docs don't compile, should figure out what's wrong
-        // and make a PR
+        let batches_row_count = batches.iter().map(|b| b.num_rows()).sum::<usize>();
+
+        assert!(batches_row_count > 20); // we probably want to make the data not terrible and assert on the data
 
         Ok(())
-
-        //TODO: Read entire lance dataset and ensure that number of rows = sent
     }
 
     fn block_until_file_exists(path: &str, timeout: Duration) -> bool {
