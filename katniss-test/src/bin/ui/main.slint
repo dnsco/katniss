@@ -2,41 +2,47 @@ import { VerticalBox , HorizontalBox, Slider, SpinBox} from "std-widgets.slint";
 import { VerticalVolume } from "vertical_volume.slint";
 
 export component MainWindow inherits Window {
-    width: 540px;
-    height: 960px;
+    width: window_width * 1px;
+    height: window_height * 1px;
     callback temperature_changed(float);
 
     in property <int> temperature;
     in property <int> temperature_ceiling;
+    in property <int> window_width;
+    in property <int> window_height;
 
     background: black;
 
     HorizontalBox {
         VerticalBox {
-            width: 540px;
+            width: window_width * 1px;
             alignment: end;
 
             HorizontalBox {
                 VerticalVolume {
                     value: temperature;
                     ceiling: temperature_ceiling;
-                    bar-height: 4px;
-                    bar-spacing: 4px;
+                    bar-height: window_height / 240 * 1px;
+                    bar-spacing: window_height / 240 * 1px;
                     background: black;
                     bar-color: #eeeeee;
                     inert-bar-color: #666;
-                    width: 50px;
-                    height: 800px;
+                    width: window_width * 0.1 * 1px;
+                    height: window_height * 0.8 * 1px;
                 }
             }
-            Slider {
-                width: 500px;
-                value: 0;
-                minimum: 0;
-                maximum: temperature_ceiling;
+            HorizontalBox {
+                alignment: center;
 
-                changed(change) => {
-                    root.temperature-changed(change);
+                Slider {
+                    width: window_width * 0.8 * 1px;
+                    value: 0;
+                    minimum: 0;
+                    maximum: temperature_ceiling;
+
+                    changed(change) => {
+                        root.temperature-changed(change);
+                    }
                 }
             }
         }

@@ -28,6 +28,8 @@ slint::include_modules!();
 // See about making a knob sim, slider works ok for demo though.
 
 const TEMPERATURE_CEILING: i32 = 1000;
+const WINDOW_WIDTH: i32 = 540;
+const WINDOW_HEIGHT: i32 = 960;
 
 fn set_jumpdrive_temperature(status: Arc<Mutex<JumpDriveStatus>>, new_temp: i32) {
     let mut status = status.lock().unwrap();
@@ -53,6 +55,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let gui_status = status.clone();
     let slider_control_status = status.clone();
 
+    window.set_window_width(WINDOW_WIDTH);
+    window.set_window_height(WINDOW_HEIGHT);
     window.set_temperature_ceiling(TEMPERATURE_CEILING);
 
     thread::spawn(move || {
