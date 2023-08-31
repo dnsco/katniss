@@ -5,13 +5,13 @@ members = ["katniss", "katniss-ingestor", "katniss-pb2arrow", "katniss-test"]
 
 [workspace.dependencies]
 anyhow = "1.0.71"
-arrow-array = "42.0.0"
-arrow-schema = "42.0.0"
+arrow-array = "43.0"
+arrow-schema = "43.0"
 chrono = "0.4.26"
 clap = { version = "4.3.3", features = ["deprecated", "derive", "env"] }
 futures = "0.3.28"
 itertools = "0.10.5"
-lance = "0.5.10"
+lance = { git = "https://github.com/lancedb/lance", rev = "eb8f2578cb54f4033599946b510a07740f6c8a50" }
 object_store = { version = "0.5.6", features = ["gcp"] }
 prost = "0.11.8"
 prost-reflect = "=0.10.2"
